@@ -5,6 +5,12 @@ This repository contains the public FTC SDK for the BIOBUZZ (2026-2027) competit
 ## Welcome!
 This GitHub repository contains the source code that is used to build an Android app to control a *FIRST* Tech Challenge competition robot.  To use this SDK, download/clone the entire project to your local computer.
 
+## BioBuzz StarterBot Features: goBILDA Pinpoint Odometry & Field Tracking
+The BioBuzz StarterBot project features full modular integration of the **goBILDA Pinpoint Odometry Computer** (`OdometrySubsystem.kt`) combined with real-time **FTC Dashboard** field visualization:
+- **Precise Position Tracking**: Automatically reads X, Y (inches), and Heading (degrees) using the Pinpoint odometry computer.
+- **Quick Reset Control**: Press the **BACK** button on Gamepad 1 during practice/teleop to instantly zero/recalibrate the robot's field position.
+- **FTC Dashboard Field View**: Real-time streaming of the robot's coordinates and heading onto the FTC Dashboard field canvas (`http://192.168.43.1:8080/dash`), allowing you to see exactly where the robot is on the field at all times.
+
 ## Requirements
 To use this Android Studio project, you will need Android Studio Narwhal 3 Feature Drop or later.
 
