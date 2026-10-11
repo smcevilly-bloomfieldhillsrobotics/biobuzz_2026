@@ -1,25 +1,22 @@
+import java.util.regex.Pattern
+
 /**
- * build.common.gradle
+ * build.common.gradle is designed to be factored out of both the FtcRobotController
+ * and TeamCode build.gradle files, and included into each of them.
  *
- * Try to avoid editing this file, as it may be updated from time to time as the FTC SDK
- * evolves. Rather, if it is necessary to customize the build process, do those edits in
- * the build.gradle file in TeamCode.
- *
- * This file contains the necessary content of the 'build.gradle' files for robot controller
- * applications built using the FTC SDK. Each individual 'build.gradle' in those applications
- * can simply contain the one line:
- *
- *      apply from: '../build.common.gradle'
- *
- * which will pick up this file here. This approach allows makes it easier to integrate
- * updates to the FTC SDK into your code.
+ * It contains the common configurations for both modules.
  */
 
-import java.util.regex.Pattern
+buildscript {
+    repositories {
+        mavenCentral()
+        google()
+    }
+}
 
 android {
 
-    compileSdkVersion 37
+    compileSdk 34
 
     signingConfigs {
         release {
@@ -104,9 +101,11 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
+    packagingOptions {
+        pickFirst '**/*.so'
+    }
     ndkVersion '21.3.6528147'
 }
 
 repositories {
 }
-

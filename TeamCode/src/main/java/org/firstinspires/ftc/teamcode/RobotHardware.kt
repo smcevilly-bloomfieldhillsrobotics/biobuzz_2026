@@ -95,7 +95,7 @@ class RobotHardware {
 
         launcher = tryGetMotorEx(hardwareMap, *LAUNCHER_NAMES)?.apply {
             zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
-            mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+            mode = DcMotor.RunMode.RUN_USING_ENCODER
         }
 
         windmillServo = tryGetCRServo(hardwareMap, *WINDMILL_SERVO_NAMES)?.apply {

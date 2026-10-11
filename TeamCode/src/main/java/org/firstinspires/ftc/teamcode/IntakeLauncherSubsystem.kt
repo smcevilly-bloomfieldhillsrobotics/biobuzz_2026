@@ -27,9 +27,10 @@ import com.acmerobotics.dashboard.config.Config
 @Config
 class IntakeLauncherSubsystem(private val robot: RobotHardware) {
 
+    @Config
     companion object {
-        @JvmField var TARGET_VELOCITY = 1400.0
-        @JvmField var MIN_VELOCITY = 1350.0
+        @JvmField var TARGET_VELOCITY = 1300.0
+        @JvmField var MIN_VELOCITY = 1250.0
     }
 
     var intakePower: Double = 0.0

@@ -23,6 +23,7 @@
 package org.firstinspires.ftc.teamcode
 
 import com.acmerobotics.dashboard.FtcDashboard
+import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
@@ -36,13 +37,15 @@ class BioBuzzStarterBotTeleop : OpMode() {
     private lateinit var odometry: OdometrySubsystem
 
     override fun init() {
+        telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
+
         robot.init(hardwareMap)
         drivetrain = DrivetrainSubsystem(robot)
         intakeLauncher = IntakeLauncherSubsystem(robot)
         odometry = OdometrySubsystem(robot)
 
         // Reset odometry position upon initialization
-        odometry.resetPosition(0.0, 0.0, 0.0)
+        odometry.resetPosition(56.0, 8.0, 0.0)
 
         telemetry.addData("Status", "Initialized")
         telemetry.update()
@@ -61,13 +64,21 @@ class BioBuzzStarterBotTeleop : OpMode() {
         intakeLauncher.update(gamepad2.right_trigger, gamepad2.left_trigger, gamepad2.right_bumper)
 
         // Update Odometry tracking and stream to FTC Dashboard field view
+        val launcherVel = robot.launcher?.velocity ?: 0.0
+
         val packet = TelemetryPacket()
+        packet.put("Launcher Vel", launcherVel)
+        packet.put("Launcher Target", IntakeLauncherSubsystem.TARGET_VELOCITY)
+        packet.put("Intake Power", intakeLauncher.intakePower)
+        packet.put("Left Drive Power", drivetrain.leftPower)
+        packet.put("Right Drive Power", drivetrain.rightPower)
+
         odometry.update(packet)
         FtcDashboard.getInstance().sendTelemetryPacket(packet)
 
         // Telemetry
         telemetry.addData("Motors", "left (%.2f), right (%.2f)", drivetrain.leftPower, drivetrain.rightPower)
-        telemetry.addData("Launcher Vel", "%.1f", robot.launcher?.velocity ?: 0.0)
+        telemetry.addData("Launcher Vel", "%.1f ticks/sec (Target: %.0f)", launcherVel, IntakeLauncherSubsystem.TARGET_VELOCITY)
         telemetry.addData("Intake Power", "%.2f", intakeLauncher.intakePower)
         telemetry.addData("--- Odometry ---", "")
         telemetry.addData("X Position (in)", "%.2f", odometry.posX)
