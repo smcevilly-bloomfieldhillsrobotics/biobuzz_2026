@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
@@ -27,8 +29,10 @@ android {
         jniLibs.useLegacyPackaging true
     }
 
-    kotlinOptions {
-        jvmTarget = '1.8'
+    kotlin {
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_1_8
+        }
     }
 }
 

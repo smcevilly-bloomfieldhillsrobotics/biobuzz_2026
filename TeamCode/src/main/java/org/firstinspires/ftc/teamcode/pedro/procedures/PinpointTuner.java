@@ -11,6 +11,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 import java.util.*;
 
+@SuppressWarnings({"all", "unchecked"})
 public class PinpointTuner extends Procedure {
     enum PodType {
         SWING_ARM,
