@@ -1,0 +1,187 @@
+/*   MIT License
+ *   Copyright (c) [2026] [Base 10 Assets, LLC]
+ *
+ *   Permission is hereby granted, free of charge, to any person obtaining a copy
+ *   of this software and associated documentation files (the "Software"), to deal
+ *   in the Software without restriction, including without limitation the rights
+ *   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *   copies of the Software, and to permit persons to whom the Software is
+ *   furnished to do so, subject to the following conditions:
+
+ *   The above copyright notice and this permission notice shall be included in all
+ *   copies or substantial portions of the Software.
+
+ *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ *   SOFTWARE.
+ */
+
+package org.firstinspires.ftc.teamcode
+
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver
+import com.qualcomm.hardware.limelightvision.Limelight3A
+import com.qualcomm.robotcore.hardware.CRServo
+import com.qualcomm.robotcore.hardware.DcMotor
+import com.qualcomm.robotcore.hardware.DcMotorEx
+import com.qualcomm.robotcore.hardware.DcMotorSimple
+import com.qualcomm.robotcore.hardware.HardwareMap
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
+
+/**
+ * RobotHardware written in idiomatic Kotlin, featuring multi-name fallbacks 
+ * for
+ * motors, servos, Limelight, and GoBilda Pinpoint Odometry Computer.
+ */
+class RobotHardware {
+
+    companion object {
+        val LEFT_DRIVE_NAMES = arrayOf("left_drive", "leftDrive", "motor0")
+        val RIGHT_DRIVE_NAMES = arrayOf("right_drive", "rightDrive", "motor1")
+        val INTAKE_NAMES = arrayOf("intake", "intake_motor", "motor2")
+        val LAUNCHER_NAMES = arrayOf("launcher", "launcher_motor", "motor3", "motor_3")
+        val CAMERA_MOTOR_NAMES = arrayOf("camera_motor", "motor3", "motor_3", "cameraMotor", "pan_motor")
+        val WINDMILL_SERVO_NAMES = arrayOf("windmill", "windmillServo", "servo0")
+        val LEFT_INTAKE_SERVO_NAMES = arrayOf("left_intake_servo", "leftIntakeServo", "servo1")
+        val RIGHT_INTAKE_SERVO_NAMES = arrayOf("right_intake_servo", "rightIntakeServo", "servo2")
+        val LIMELIGHT_NAMES = arrayOf("limelight", "limelight3a", "camera")
+        val PINPOINT_NAMES = arrayOf("pinpoint", "odometry", "pinpoint_odom")
+    }
+
+    var leftDrive: DcMotor? = null
+    var rightDrive: DcMotor? = null
+    var intake: DcMotor? = null
+    var launcher: DcMotorEx? = null
+    var cameraMotor: DcMotor? = null
+    var windmillServo: CRServo? = null
+    var leftIntakeServo: CRServo? = null
+    var rightIntakeServo: CRServo? = null
+    var limelight: Limelight3A? = null
+    var pinpoint: GoBildaPinpointDriver? = null
+
+    fun init(hardwareMap: HardwareMap) {
+        initAll(hardwareMap)
+    }
+
+    fun initAll(hardwareMap: HardwareMap) {
+        initDrivetrain(hardwareMap)
+        initIntakeAndLauncher(hardwareMap)
+        initLimelight(hardwareMap)
+        initPinpoint(hardwareMap)
+    }
+
+    fun initDrivetrain(hardwareMap: HardwareMap) {
+        leftDrive = tryGetMotor(hardwareMap, *LEFT_DRIVE_NAMES)?.apply {
+            direction = DcMotorSimple.Direction.FORWARD
+            zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+            mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        }
+
+        rightDrive = tryGetMotor(hardwareMap, *RIGHT_DRIVE_NAMES)?.apply {
+            direction = DcMotorSimple.Direction.REVERSE
+            zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+            mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        }
+    }
+
+    fun initIntakeAndLauncher(hardwareMap: HardwareMap) {
+        intake = tryGetMotor(hardwareMap, *INTAKE_NAMES)?.apply {
+            zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+            mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        }
+
+        launcher = tryGetMotorEx(hardwareMap, *LAUNCHER_NAMES)?.apply {
+            zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+            mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        }
+
+        windmillServo = tryGetCRServo(hardwareMap, *WINDMILL_SERVO_NAMES)?.apply {
+            direction = DcMotorSimple.Direction.FORWARD
+            power = 0.0
+        }
+
+        leftIntakeServo = tryGetCRServo(hardwareMap, *LEFT_INTAKE_SERVO_NAMES)?.apply {
+            direction = DcMotorSimple.Direction.REVERSE
+            power = 0.0
+        }
+
+        rightIntakeServo = tryGetCRServo(hardwareMap, *RIGHT_INTAKE_SERVO_NAMES)?.apply {
+            direction = DcMotorSimple.Direction.REVERSE
+            power = 0.0
+        }
+    }
+
+    fun initLimelight(hardwareMap: HardwareMap) {
+        cameraMotor = tryGetMotor(hardwareMap, *CAMERA_MOTOR_NAMES)?.apply {
+            zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+            mode = DcMotor.RunMode.RUN_USING_ENCODER
+        }
+
+        for (name in LIMELIGHT_NAMES) {
+            try {
+                limelight = hardwareMap[Limelight3A::class.java, name]
+                if (limelight != null) {
+                    limelight?.setPollRateHz(100)
+                    limelight?.start()
+                    limelight?.pipelineSwitch(0)
+                    break
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun initPinpoint(hardwareMap: HardwareMap) {
+        for (name in PINPOINT_NAMES) {
+            try {
+                pinpoint = hardwareMap[GoBildaPinpointDriver::class.java, name]?.apply {
+                    setOffsets(OdometrySubsystem.X_POD_OFFSET_MM, OdometrySubsystem.Y_POD_OFFSET_MM, DistanceUnit.MM)
+                    setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
+                    setEncoderDirections(
+                        GoBildaPinpointDriver.EncoderDirection.REVERSED,
+                        GoBildaPinpointDriver.EncoderDirection.FORWARD,
+                    )
+                    resetPosAndIMU()
+                }
+                if (pinpoint != null) break
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun tryGetMotor(hardwareMap: HardwareMap, vararg names: String): DcMotor? {
+        for (name in names) {
+            try {
+                val motor = hardwareMap[DcMotor::class.java, name]
+                if (motor != null) return motor
+            } catch (_: Exception) {
+            }
+        }
+        return null
+    }
+
+    private fun tryGetMotorEx(hardwareMap: HardwareMap, vararg names: String): DcMotorEx? {
+        for (name in names) {
+            try {
+                val motor = hardwareMap[DcMotorEx::class.java, name]
+                if (motor != null) return motor
+            } catch (_: Exception) {
+            }
+        }
+        return null
+    }
+
+    private fun tryGetCRServo(hardwareMap: HardwareMap, vararg names: String): CRServo? {
+        for (name in names) {
+            try {
+                val servo = hardwareMap[CRServo::class.java, name]
+                if (servo != null) return servo
+            } catch (_: Exception) {
+            }
+        }
+        return null
+    }
+}
