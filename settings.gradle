@@ -12,3 +12,4 @@ plugins {
 include ':FtcRobotController'
 include ':TeamCode'
 include ':MeepMeepTesting'
+include ':RRPathGen'

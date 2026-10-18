@@ -3,6 +3,7 @@ repositories {
     google() // Needed for androidx
     maven { url = 'https://maven.brott.dev/' } // Needed for FTC Dashboard & Road Runner
     maven { url = 'https://mymaven.bylazar.com/releases' } // Needed for Panels Dashboard
+    maven { url = 'https://repo.dairy.foundation/releases' } // Needed for Dairy Foundation / Sloth
     maven { url = 'https://jitpack.io' } // JitPack for FTC libraries
 }
 
@@ -23,4 +24,7 @@ dependencies {
     implementation 'com.acmerobotics.roadrunner:core:1.0.1'
     implementation 'com.acmerobotics.roadrunner:actions:1.0.1'
     implementation 'com.acmerobotics.roadrunner:ftc:0.1.25'
+
+    // Panels Dashboard
+    implementation 'com.bylazar:fullpanels:1.0.18'
 }

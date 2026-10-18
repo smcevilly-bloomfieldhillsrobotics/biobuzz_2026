@@ -29,33 +29,75 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
 
     @Config
     companion object {
-        @JvmField var TARGET_VELOCITY = 1300.0
-        @JvmField var MIN_VELOCITY = 1250.0
+        @JvmField var TARGET_VELOCITY = 1200.0
+        @JvmField var MIN_VELOCITY = 1150.0
+        @JvmField var LAUNCHER_2_TARGET_VELOCITY = 1300.0
+        @JvmField var LAUNCHER_2_MIN_VELOCITY = 1250.0
     }
 
     var intakePower: Double = 0.0
         private set
 
-    fun update(rightTrigger: Float, leftTrigger: Float, rightBumper: Boolean) {
-        intakePower = (rightTrigger - leftTrigger).toDouble()
+    fun adjustVelocity(delta: Double) {
+        TARGET_VELOCITY += delta
+        MIN_VELOCITY += delta
+        LAUNCHER_2_TARGET_VELOCITY += delta
+        LAUNCHER_2_MIN_VELOCITY += delta
+    }
+
+    fun adjustLauncher1Velocity(delta: Double) {
+        TARGET_VELOCITY += delta
+        MIN_VELOCITY += delta
+    }
+
+    fun adjustLauncher2Velocity(delta: Double) {
+        LAUNCHER_2_TARGET_VELOCITY += delta
+        LAUNCHER_2_MIN_VELOCITY += delta
+    }
+
+    fun update(
+        rightTrigger: Float,
+        leftTrigger: Float,
+        rightBumper: Boolean,
+        leftBumper: Boolean
+    ) {
+        // Intake controls: Right Bumper = intake forward, Left Bumper = intake reverse
+        intakePower = when {
+            rightBumper -> 1.0
+            leftBumper -> -1.0
+            else -> 0.0
+        }
 
         robot.intake?.let { it.power = intakePower }
         robot.leftIntakeServo?.let { it.power = intakePower }
         robot.rightIntakeServo?.let { it.power = intakePower }
 
-        val windmillPower = if (rightBumper) {
+        // Launcher controls: Right Trigger = spin up forward, Left Trigger = spin reversed
+        val launcherForward = rightTrigger > 0.1f
+        val launcherReverse = leftTrigger > 0.1f
+
+        val windmillPower = if (launcherForward) {
             robot.launcher?.velocity = TARGET_VELOCITY
+            robot.launcher2?.velocity = LAUNCHER_2_TARGET_VELOCITY
+
             val currentVel = robot.launcher?.velocity ?: 0.0
-            if (currentVel > MIN_VELOCITY) {
+            val currentVel2 = robot.launcher2?.velocity ?: 0.0
+
+            if (currentVel > MIN_VELOCITY && currentVel2 > LAUNCHER_2_MIN_VELOCITY) {
                 intakePower = (intakePower + 0.5).coerceIn(-1.0, 1.0)
                 robot.intake?.let { it.power = intakePower }
                 1.0
             } else {
                 0.0
             }
+        } else if (launcherReverse) {
+            robot.launcher?.velocity = -TARGET_VELOCITY
+            robot.launcher2?.velocity = -LAUNCHER_2_TARGET_VELOCITY
+            -1.0
         } else {
             robot.launcher?.velocity = 0.0
-            if (leftTrigger > rightTrigger) {
+            robot.launcher2?.velocity = 0.0
+            if (leftBumper) {
                 -1.0
             } else {
                 0.0
@@ -71,6 +113,7 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
         robot.leftIntakeServo?.power = 0.0
         robot.rightIntakeServo?.power = 0.0
         robot.launcher?.velocity = 0.0
+        robot.launcher2?.velocity = 0.0
         robot.windmillServo?.power = 0.0
     }
 }

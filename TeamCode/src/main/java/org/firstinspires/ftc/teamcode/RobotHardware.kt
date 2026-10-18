@@ -41,8 +41,13 @@ class RobotHardware {
     companion object {
         val LEFT_DRIVE_NAMES = arrayOf("left_drive", "leftDrive", "motor0")
         val RIGHT_DRIVE_NAMES = arrayOf("right_drive", "rightDrive", "motor1")
+        val FRONT_LEFT_DRIVE_NAMES = arrayOf("front_left_drive", "leftFront", "frontLeft", "motor0")
+        val FRONT_RIGHT_DRIVE_NAMES = arrayOf("front_right_drive", "rightFront", "frontRight", "motor1")
+        val BACK_LEFT_DRIVE_NAMES = arrayOf("back_left_drive", "leftRear", "backLeft", "motor2")
+        val BACK_RIGHT_DRIVE_NAMES = arrayOf("back_right_drive", "rightRear", "backRight", "motor3")
         val INTAKE_NAMES = arrayOf("intake", "intake_motor", "motor2")
         val LAUNCHER_NAMES = arrayOf("launcher", "launcher_motor", "motor3", "motor_3")
+        val LAUNCHER_2_NAMES = arrayOf("launcher2", "launcher_motor_2", "motor4", "launcher_2")
         val CAMERA_MOTOR_NAMES = arrayOf("camera_motor", "motor3", "motor_3", "cameraMotor", "pan_motor")
         val WINDMILL_SERVO_NAMES = arrayOf("windmill", "windmillServo", "servo0")
         val LEFT_INTAKE_SERVO_NAMES = arrayOf("left_intake_servo", "leftIntakeServo", "servo1")
@@ -53,8 +58,13 @@ class RobotHardware {
 
     var leftDrive: DcMotor? = null
     var rightDrive: DcMotor? = null
+    var frontLeftDrive: DcMotor? = null
+    var frontRightDrive: DcMotor? = null
+    var backLeftDrive: DcMotor? = null
+    var backRightDrive: DcMotor? = null
     var intake: DcMotor? = null
     var launcher: DcMotorEx? = null
+    var launcher2: DcMotorEx? = null
     var cameraMotor: DcMotor? = null
     var windmillServo: CRServo? = null
     var leftIntakeServo: CRServo? = null
@@ -87,6 +97,32 @@ class RobotHardware {
         }
     }
 
+    fun initMecanumDrivetrain(hardwareMap: HardwareMap) {
+        frontLeftDrive = tryGetMotor(hardwareMap, *FRONT_LEFT_DRIVE_NAMES)?.apply {
+            direction = DcMotorSimple.Direction.REVERSE
+            zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+            mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        }
+
+        frontRightDrive = tryGetMotor(hardwareMap, *FRONT_RIGHT_DRIVE_NAMES)?.apply {
+            direction = DcMotorSimple.Direction.FORWARD
+            zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+            mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        }
+
+        backLeftDrive = tryGetMotor(hardwareMap, *BACK_LEFT_DRIVE_NAMES)?.apply {
+            direction = DcMotorSimple.Direction.REVERSE
+            zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+            mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        }
+
+        backRightDrive = tryGetMotor(hardwareMap, *BACK_RIGHT_DRIVE_NAMES)?.apply {
+            direction = DcMotorSimple.Direction.FORWARD
+            zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+            mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        }
+    }
+
     fun initIntakeAndLauncher(hardwareMap: HardwareMap) {
         intake = tryGetMotor(hardwareMap, *INTAKE_NAMES)?.apply {
             zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
@@ -94,6 +130,12 @@ class RobotHardware {
         }
 
         launcher = tryGetMotorEx(hardwareMap, *LAUNCHER_NAMES)?.apply {
+            zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
+            mode = DcMotor.RunMode.RUN_USING_ENCODER
+        }
+
+        launcher2 = tryGetMotorEx(hardwareMap, *LAUNCHER_2_NAMES)?.apply {
+            direction = DcMotorSimple.Direction.REVERSE
             zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
             mode = DcMotor.RunMode.RUN_USING_ENCODER
         }

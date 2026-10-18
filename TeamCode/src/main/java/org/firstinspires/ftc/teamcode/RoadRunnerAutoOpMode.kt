@@ -1,9 +1,13 @@
 package org.firstinspires.ftc.teamcode
 
 import com.acmerobotics.dashboard.FtcDashboard
+import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -16,7 +20,8 @@ import kotlin.math.sqrt
  * and Limelight 3A AprilTag targeting.
  *
  * Drives to field waypoints, checks if the Limelight camera is live and an AprilTag is detected,
- * and if detected, smoothly aligns and approaches the AprilTag to a calibrated target distance.
+ * and if detected, smoothly aligns and approaches the AprilTag to a calibrated target distance,
+ * then returns to (0, 0).
  */
 @Autonomous(name = "BioBuzz Autonomous (Drive to Target)", group = "Autonomous")
 class RoadRunnerAutoOpMode : LinearOpMode() {
@@ -32,60 +37,67 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
 
     private val robot = RobotHardware()
     private lateinit var drive: RoadRunnerTankDrive
+    private var currentStep = "Initializing"
 
     override fun runOpMode() {
+        // Direct telemetry to both Driver Station and FTC Dashboard
+        telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
+
         robot.init(hardwareMap)
         drive = RoadRunnerTankDrive(robot)
 
-        // Reset starting odometry pose to field origin (0, 0, 0 rad)
-        robot.pinpoint?.resetPosAndIMU()
+        // Reset starting odometry pose to initial field position (56.0, 8.0, 0.0 rad)
+        robot.pinpoint?.setPosition(
+            Pose2D(
+                DistanceUnit.INCH,
+                56.0,
+                8.0,
+                AngleUnit.DEGREES,
+                0.0
+            )
+        )
 
-        telemetry.addData("Status", "Autonomous Ready")
-        telemetry.update()
+        currentStep = "Ready (Waiting for Start)"
+        val initialPose = drive.updatePose()
+        updateAutoTelemetry(initialPose.position.x, initialPose.position.y, Math.toDegrees(initialPose.heading.toDouble()))
 
         waitForStart()
 
         if (!opModeIsActive()) return
 
         // Step 1: Drive forward 30 inches on the field
-        telemetry.addData("Auto Step", "1: Driving forward 30 inches")
-        telemetry.update()
-        publishDashboard(56.0, 8.0, 0.0)
+        currentStep = "1: Driving forward 30 in"
+        updateAutoTelemetry(56.0, 8.0, 0.0)
         driveStraightInches(targetDistanceInches = 30.0, speed = 0.5)
 
-        sleep(500)
-        drive.updatePose().let { publishDashboard(it.position.x, it.position.y, Math.toDegrees(it.heading.toDouble())) }
+        sleep(300)
+        drive.updatePose().let { updateAutoTelemetry(it.position.x, it.position.y, Math.toDegrees(it.heading.toDouble())) }
 
-        // Step 2: Turn 90 degrees counter-clockwise (positive heading)
-        telemetry.addData("Auto Step", "2: Turning 90 degrees")
-        telemetry.update()
+        // Step 2: Turn 90 degrees counter-clockwise
+        currentStep = "2: Turning 90°"
         turnDegrees(targetAngleDegrees = 90.0, speed = 0.4)
 
-        sleep(500)
-        drive.updatePose().let { publishDashboard(it.position.x, it.position.y, Math.toDegrees(it.heading.toDouble())) }
+        sleep(300)
+        drive.updatePose().let { updateAutoTelemetry(it.position.x, it.position.y, Math.toDegrees(it.heading.toDouble())) }
 
-        // Step 3: Drive forward another 20 inches to target waypoint
-        telemetry.addData("Auto Step", "3: Driving forward 20 inches to target area")
-        telemetry.update()
+        // Step 3: Drive forward another 20 inches to target area
+        currentStep = "3: Driving forward 20 in"
         driveStraightInches(targetDistanceInches = 20.0, speed = 0.5)
 
         // Step 4: Check if Limelight is live and leverage AprilTag to approach
-        telemetry.addData("Auto Step", "4: Checking Limelight AprilTag...")
-        telemetry.update()
+        currentStep = "4: Limelight AprilTag Align & Approach"
         approachAprilTagIfDetected(targetDistanceInches = DESIRED_TAG_DISTANCE_INCHES, timeoutSec = 5.0)
 
         // Step 5: Navigate back to (0, 0)
-        telemetry.addData("Auto Step", "5: Driving to (0, 0)")
-        telemetry.update()
+        currentStep = "5: Driving to (0, 0)"
         driveToPoint(targetX = 0.0, targetY = 0.0, speed = 0.5)
 
-        telemetry.addData("Auto Step", "Complete! Holding position at (0, 0).")
-        telemetry.update()
+        currentStep = "Complete! Holding position at (0, 0)"
 
         // Keep updating telemetry & dashboard while active
         while (opModeIsActive()) {
             val currentPose = drive.updatePose()
-            publishDashboard(currentPose.position.x, currentPose.position.y, Math.toDegrees(currentPose.heading.toDouble()))
+            updateAutoTelemetry(currentPose.position.x, currentPose.position.y, Math.toDegrees(currentPose.heading.toDouble()))
             sleep(20)
         }
 
@@ -194,14 +206,24 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
                     0.0
                 }
 
-                telemetry.addData("Limelight", "Target Tag #${tag.id} Locked")
-                telemetry.addData("Tag Bearing Error", "%.2f°", bearingErrorDeg)
-                telemetry.addData("Tag Dist", "%.1f in (err: %.1f)", tag.distanceInches, rangeErrorInches)
-                publishDashboard(currentPose.position.x, currentPose.position.y, Math.toDegrees(currentPose.heading.toDouble()))
+                updateAutoTelemetry(
+                    currentPose.position.x,
+                    currentPose.position.y,
+                    Math.toDegrees(currentPose.heading.toDouble()),
+                    tag,
+                    targetDistanceInches
+                )
 
                 // Stop if we are within 1.5 inches of target distance and within 2 degrees of alignment
                 if (abs(bearingErrorDeg) < 2.0 && (tag.distanceInches == 0.0 || abs(rangeErrorInches) < 1.5)) {
-                    telemetry.addData("Limelight", "Target distance & alignment reached!")
+                    currentStep = "Limelight Tag Alignment Achieved"
+                    updateAutoTelemetry(
+                        currentPose.position.x,
+                        currentPose.position.y,
+                        Math.toDegrees(currentPose.heading.toDouble()),
+                        tag,
+                        targetDistanceInches
+                    )
                     break
                 }
 
@@ -221,12 +243,12 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
                 drive.setDrivePowers(leftPower, rightPower)
             } else {
                 drive.stop()
-                if (tagSeen) {
-                    telemetry.addData("Limelight", "Lost tag view during approach")
-                } else {
-                    telemetry.addData("Limelight", "No AprilTag visible from waypoint; holding position")
-                }
-                publishDashboard(currentPose.position.x, currentPose.position.y, Math.toDegrees(currentPose.heading.toDouble()))
+                currentStep = if (tagSeen) "Lost Tag View - Holding" else "Searching for Tag..."
+                updateAutoTelemetry(
+                    currentPose.position.x,
+                    currentPose.position.y,
+                    Math.toDegrees(currentPose.heading.toDouble())
+                )
             }
 
             sleep(20)
@@ -250,7 +272,7 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
             val pose = drive.updatePose()
             val distanceTraveled = hypot(pose.position.x - startX, pose.position.y - startY)
 
-            publishDashboard(pose.position.x, pose.position.y, Math.toDegrees(pose.heading.toDouble()))
+            updateAutoTelemetry(pose.position.x, pose.position.y, Math.toDegrees(pose.heading.toDouble()))
 
             if (distanceTraveled >= targetDistanceInches) break
 
@@ -282,7 +304,7 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
             val pose = drive.updatePose()
             val currentHeadingDeg = Math.toDegrees(pose.heading.toDouble())
 
-            publishDashboard(pose.position.x, pose.position.y, currentHeadingDeg)
+            updateAutoTelemetry(pose.position.x, pose.position.y, currentHeadingDeg)
 
             var angleError = targetHeadingDeg - currentHeadingDeg
             while (angleError > 180.0) angleError -= 360.0
@@ -310,7 +332,7 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
             val dy = targetY - pose.position.y
             val distanceRemaining = hypot(dx, dy)
 
-            publishDashboard(pose.position.x, pose.position.y, Math.toDegrees(pose.heading.toDouble()))
+            updateAutoTelemetry(pose.position.x, pose.position.y, Math.toDegrees(pose.heading.toDouble()))
 
             // Target reached within tolerance
             if (distanceRemaining < 1.5) break
@@ -339,15 +361,53 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
         drive.stop()
     }
 
-    private fun publishDashboard(x: Double, y: Double, headingDeg: Double) {
+    /**
+     * Comprehensive telemetry and Dashboard streaming:
+     * - Odometry (X, Y, Heading)
+     * - Drivetrain motor powers
+     * - Launcher and Intake states
+     * - Limelight AprilTag targeting status and 3D pose
+     * - Field overlay drawing
+     */
+    private fun updateAutoTelemetry(
+        x: Double,
+        y: Double,
+        headingDeg: Double,
+        tag: AprilTagTarget? = null,
+        targetDistanceInches: Double = DESIRED_TAG_DISTANCE_INCHES
+    ) {
         val launcherVel = robot.launcher?.velocity ?: 0.0
+        val launcher2Vel = robot.launcher2?.velocity ?: 0.0
+        val leftPower = robot.leftDrive?.power ?: 0.0
+        val rightPower = robot.rightDrive?.power ?: 0.0
+        val intakePower = robot.intake?.power ?: 0.0
+        val limelightStatus = robot.limelight?.status
 
+        // --- FTC Dashboard Packet ---
         val packet = TelemetryPacket()
+        packet.put("Auto Step", currentStep)
         packet.put("Auto X (in)", x)
         packet.put("Auto Y (in)", y)
         packet.put("Auto Heading (deg)", headingDeg)
-        packet.put("Launcher Velocity", launcherVel)
+        packet.put("Left Drive Power", leftPower)
+        packet.put("Right Drive Power", rightPower)
+        packet.put("Launcher 1 Velocity", launcherVel)
+        packet.put("Launcher 2 Velocity", launcher2Vel)
+        packet.put("Intake Power", intakePower)
 
+        // Limelight telemetry in packet
+        if (limelightStatus != null) {
+            packet.put("Limelight FPS", limelightStatus.fps)
+            packet.put("Limelight Temp (°C)", limelightStatus.temp)
+        }
+        if (tag != null && tag.isValid) {
+            packet.put("Target Tag ID", tag.id)
+            packet.put("Tag Bearing Error (°)", tag.txDegrees)
+            packet.put("Tag Distance (in)", tag.distanceInches)
+            packet.put("Tag Range Error (in)", tag.distanceInches - targetDistanceInches)
+        }
+
+        // Field View Overlay
         val fieldOverlay = packet.fieldOverlay()
         fieldOverlay.setStroke("#4CAF50")
         fieldOverlay.strokeCircle(x, y, 9.0)
@@ -358,8 +418,28 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
 
         FtcDashboard.getInstance().sendTelemetryPacket(packet)
 
-        telemetry.addData("Pose", "X: %.1f in, Y: %.1f in, Heading: %.1f°", x, y, headingDeg)
-        telemetry.addData("Launcher Vel", "%.1f ticks/sec", launcherVel)
+        // --- Driver Station Telemetry ---
+        telemetry.addData("--- Autonomous Status ---", "")
+        telemetry.addData("Step", currentStep)
+        telemetry.addData("Odometry Pose", "X: %.2f in, Y: %.2f in, Head: %.1f°", x, y, headingDeg)
+        telemetry.addData("Drive Motors", "Left: %.2f, Right: %.2f", leftPower, rightPower)
+        telemetry.addData("Launcher / Intake", "Vel: %.1f ticks/sec, Intake: %.2f", launcherVel, intakePower)
+
+        telemetry.addData("--- Limelight & Vision ---", "")
+        if (limelightStatus != null && limelightStatus.fps > 0.0) {
+            telemetry.addData("Limelight", "Online (%.0f FPS, %.1f°C)", limelightStatus.fps, limelightStatus.temp)
+            if (tag != null && tag.isValid) {
+                val rangeErr = if (tag.distanceInches > 0.0) tag.distanceInches - targetDistanceInches else 0.0
+                telemetry.addData("AprilTag #%d", tag.id)
+                telemetry.addData("Tag Bearing Err", "%.2f°", tag.txDegrees)
+                telemetry.addData("Tag Distance", "%.1f in (err: %.1f in)", tag.distanceInches, rangeErr)
+            } else {
+                telemetry.addData("AprilTag", "No target detected")
+            }
+        } else {
+            telemetry.addData("Limelight", "Offline or Not Streaming")
+        }
+
         telemetry.update()
     }
 }

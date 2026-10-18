@@ -35,6 +35,12 @@ class BioBuzzStarterBotTeleop : OpMode() {
     private lateinit var drivetrain: DrivetrainSubsystem
     private lateinit var intakeLauncher: IntakeLauncherSubsystem
     private lateinit var odometry: OdometrySubsystem
+    
+    // State tracking for edge-detection on D-Pad buttons
+    private var lastDpadRight = false
+    private var lastDpadLeft = false
+    private var lastDpadUp = false
+    private var lastDpadDown = false
 
     override fun init() {
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
@@ -52,7 +58,7 @@ class BioBuzzStarterBotTeleop : OpMode() {
     }
 
     override fun loop() {
-        // Driver 1: Mobility (Arcade Drive)
+        // Driver 1: Mobility (Road Runner Tank Drive / Arcade Drive)
         drivetrain.arcadeDrive(-gamepad1.left_stick_y.toDouble(), gamepad1.right_stick_x.toDouble())
 
         // Quick Odometry Reset (Press BACK on Gamepad 1 to recalibrate/zero field position)
@@ -60,8 +66,31 @@ class BioBuzzStarterBotTeleop : OpMode() {
             odometry.resetPosition(0.0, 0.0, 0.0)
         }
 
-        // Driver 2: Intake & Launcher
-        intakeLauncher.update(gamepad2.right_trigger, gamepad2.left_trigger, gamepad2.right_bumper)
+        // Driver 2: Intake & Single Launcher
+        intakeLauncher.update(
+            gamepad2.right_trigger,
+            gamepad2.left_trigger,
+            gamepad2.right_bumper,
+            gamepad2.left_bumper
+        )
+
+        // Driver 2: Adjust Launcher Velocity (D-Pad Up/Down or Left/Right)
+        if (gamepad2.dpad_up && !lastDpadUp) {
+            intakeLauncher.adjustLauncher1Velocity(50.0)
+        }
+        if (gamepad2.dpad_down && !lastDpadDown) {
+            intakeLauncher.adjustLauncher1Velocity(-50.0)
+        }
+        if (gamepad2.dpad_right && !lastDpadRight) {
+            intakeLauncher.adjustLauncher1Velocity(50.0)
+        }
+        if (gamepad2.dpad_left && !lastDpadLeft) {
+            intakeLauncher.adjustLauncher1Velocity(-50.0)
+        }
+        lastDpadUp = gamepad2.dpad_up
+        lastDpadDown = gamepad2.dpad_down
+        lastDpadRight = gamepad2.dpad_right
+        lastDpadLeft = gamepad2.dpad_left
 
         // Update Odometry tracking and stream to FTC Dashboard field view
         val launcherVel = robot.launcher?.velocity ?: 0.0
