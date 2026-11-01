@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "robot": {
+    "width": 18.0,
+    "length": 18.0
+  },
+  "startPose": {
+    "x": 56.0,
+    "y": 8.0,
+    "heading": 90.0,
+    "headingRadians": 1.5707963267948966
+  },
+  "poses": [
+    {
+      "name": "startPose",
+      "x": 56.0,
+      "y": 8.0,
+      "heading": 90.0,
+      "headingRadians": 1.5707963267948966
+    },
+    {
+      "name": "shootingPosition",
+      "x": 56.0,
+      "y": 36.0,
+      "heading": 90.0,
+      "headingRadians": 1.5707963267948966
+    },
+    {
+      "name": "reloadingStart",
+      "x": 34.8008,
+      "y": 10.97,
+      "heading": 180.0,
+      "headingRadians": 3.141592653589793
+    },
+    {
+      "name": "loadGarden",
+      "x": 0.8333,
+      "y": 14.1918,
+      "heading": -5.4183,
+      "headingRadians": -0.09456685418836521
+    },
+    {
+      "name": "oppositeShootingPosition",
+      "x": 52.8239,
+      "y": 126.8941,
+      "heading": 270.0,
+      "headingRadians": 4.71238898038469
+    }
+  ],
+  "paths": [
+    {
+      "id": 1,
+      "name": "shootingPositionPath",
+      "type": "LINE",
+      "pathType": "Line",
+      "startPose": {
+        "x": 56.0,
+        "y": 8.0,
+        "heading": 90.0
+      },
+      "endPose": {
+        "x": 56.0,
+        "y": 36.0,
+        "heading": 90.0
+      },
+      "controlPoints": [
+        { "x": 56.0, "y": 8.0 },
+        { "x": 56.0, "y": 36.0 }
+      ],
+      "headingInterpolation": "CONSTANT",
+      "constantHeading": 90.0,
+      "reversed": false
+    },
+    {
+      "id": 2,
+      "name": "reloadingStartPath",
+      "type": "BEZIER",
+      "pathType": "BezierCurve",
+      "startPose": {
+        "x": 56.0,
+        "y": 36.0,
+        "heading": 90.0
+      },
+      "endPose": {
+        "x": 34.8008,
+        "y": 10.97,
+        "heading": 180.0
+      },
+      "controlPoints": [
+        { "x": 56.0, "y": 8.0 },
+        { "x": 56.0, "y": 36.0 },
+        { "x": 34.8008, "y": 10.97 }
+      ],
+      "headingInterpolation": "LINEAR",
+      "startHeading": 90.0,
+      "endHeading": 180.0,
+      "reversed": false
+    },
+    {
+      "id": 3,
+      "name": "loadGardenPath",
+      "type": "BEZIER",
+      "pathType": "BezierCurve",
+      "startPose": {
+        "x": 34.8008,
+        "y": 10.97,
+        "heading": 180.0
+      },
+      "endPose": {
+        "x": 0.8333,
+        "y": 14.1918,
+        "heading": -5.4183
+      },
+      "controlPoints": [
+        { "x": 34.8008, "y": 10.97 },
+        { "x": 0.8333, "y": 14.1918 }
+      ],
+      "headingInterpolation": "REVERSE_TANGENT",
+      "startHeading": 180.0,
+      "endHeading": -5.4183,
+      "reversed": true
+    },
+    {
+      "id": 4,
+      "name": "oppositeShootingPositionPath",
+      "type": "BEZIER",
+      "pathType": "BezierCurve",
+      "startPose": {
+        "x": 0.8333,
+        "y": 14.1918,
+        "heading": -5.4183
+      },
+      "endPose": {
+        "x": 52.8239,
+        "y": 126.8941,
+        "heading": 270.0
+      },
+      "controlPoints": [
+        { "x": 0.8333, "y": 14.1918 },
+        { "x": 52.8239, "y": 126.8941 }
+      ],
+      "headingInterpolation": "LINEAR",
+      "startHeading": -5.4183,
+      "endHeading": 270.0,
+      "reversed": false
+    }
+  ]
+}

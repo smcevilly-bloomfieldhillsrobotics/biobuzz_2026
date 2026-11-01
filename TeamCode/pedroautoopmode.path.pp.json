@@ -1,0 +1,225 @@
+{
+  "version": "2.0.0",
+  "timestamp": "2026-03-31T12:00:00.000Z",
+  "startPoint": {
+    "x": 56,
+    "y": 8,
+    "headingDeg": 90,
+    "locked": false
+  },
+  "lines": [
+    {
+      "id": "startPath",
+      "color": "#ffc516",
+      "name": "Start Path",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 2500,
+      "waitBeforeName": "",
+      "waitAfterName": "Launch Sequence",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 56,
+        "y": 36
+      },
+      "controlPoints": [],
+      "heading": {
+        "type": "constant",
+        "startDeg": 90,
+        "endDeg": 90
+      }
+    },
+    {
+      "id": "line-reloading-start",
+      "color": "#10b981",
+      "name": "Reloading Start Path",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 34.8008,
+        "y": 10.97
+      },
+      "controlPoints": [
+        {
+          "x": 56,
+          "y": 20
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "startDeg": 90,
+        "endDeg": 180
+      }
+    },
+    {
+      "id": "line-load-garden",
+      "color": "#3b82f6",
+      "name": "Load Garden Path",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 0.8333,
+        "y": 14.1918
+      },
+      "controlPoints": [
+        {
+          "x": 17.8,
+          "y": 12.58
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "startDeg": 180,
+        "endDeg": -5.4183
+      }
+    },
+    {
+      "id": "line-opposite-shooting",
+      "color": "#8b5cf6",
+      "name": "Opposite Shooting Position Path",
+      "locked": false,
+      "waitBeforeMs": 0,
+      "waitAfterMs": 0,
+      "waitBeforeName": "",
+      "waitAfterName": "",
+      "kind": "atomic",
+      "endPoint": {
+        "x": 52.8239,
+        "y": 126.8941
+      },
+      "controlPoints": [
+        {
+          "x": 26.8,
+          "y": 70.5
+        }
+      ],
+      "heading": {
+        "type": "linear",
+        "startDeg": -5.4183,
+        "endDeg": 270
+      }
+    }
+  ],
+  "shapes": [
+    {
+      "id": "biobuzz-red-hive",
+      "name": "Red HIVE",
+      "vertices": [
+        { "x": 46, "y": 50 },
+        { "x": 48.6, "y": 50 },
+        { "x": 48.6, "y": 91.4 },
+        { "x": 46, "y": 91.4 }
+      ],
+      "color": "#dc2626",
+      "fillColor": "#ff6b6b"
+    },
+    {
+      "id": "biobuzz-blue-hive",
+      "name": "Blue HIVE",
+      "vertices": [
+        { "x": 96.5, "y": 91.4 },
+        { "x": 93.9, "y": 91.4 },
+        { "x": 93.9, "y": 50 },
+        { "x": 96.5, "y": 50 }
+      ],
+      "color": "#2563eb",
+      "fillColor": "#60a5fa"
+    },
+    {
+      "id": "biobuzz-flower-top",
+      "name": "Scoring-Side FLOWER",
+      "vertices": [
+        { "x": 43.4, "y": 141.5 },
+        { "x": 50.1, "y": 141.5 },
+        { "x": 50.1, "y": 139.4 },
+        { "x": 46.75, "y": 137.7 },
+        { "x": 43.4, "y": 139.4 }
+      ],
+      "color": "#dc2626",
+      "fillColor": "#ff6b6b"
+    },
+    {
+      "id": "biobuzz-flower-right",
+      "name": "Blue Alliance FLOWER",
+      "vertices": [
+        { "x": 141.5, "y": 98.1 },
+        { "x": 139.4, "y": 98.1 },
+        { "x": 137.7, "y": 94.75 },
+        { "x": 139.4, "y": 91.4 },
+        { "x": 141.5, "y": 91.4 }
+      ],
+      "color": "#2563eb",
+      "fillColor": "#60a5fa"
+    },
+    {
+      "id": "biobuzz-flower-bottom",
+      "name": "Audience-Side FLOWER",
+      "vertices": [
+        { "x": 91.15, "y": 0 },
+        { "x": 97.8, "y": 0 },
+        { "x": 97.8, "y": 2.1 },
+        { "x": 94.5, "y": 3.8 },
+        { "x": 91.15, "y": 2.1 }
+      ],
+      "color": "#2563eb",
+      "fillColor": "#60a5fa"
+    },
+    {
+      "id": "biobuzz-flower-left",
+      "name": "Red Alliance FLOWER",
+      "vertices": [
+        { "x": 0, "y": 50.35 },
+        { "x": 2.1, "y": 50.35 },
+        { "x": 3.8, "y": 47 },
+        { "x": 2.1, "y": 43.65 },
+        { "x": 0, "y": 43.65 }
+      ],
+      "color": "#dc2626",
+      "fillColor": "#ff6b6b"
+    }
+  ],
+  "sequence": [
+    {
+      "kind": "path",
+      "lineId": "startPath"
+    },
+    {
+      "kind": "path",
+      "lineId": "line-reloading-start"
+    },
+    {
+      "kind": "path",
+      "lineId": "line-load-garden"
+    },
+    {
+      "kind": "path",
+      "lineId": "line-opposite-shooting"
+    }
+  ],
+  "fieldPoints": [],
+  "robot": {
+    "forwardVelocity": 75,
+    "strafeVelocity": 65,
+    "aVelocity": 3.141592653589793,
+    "kFriction": 0.1,
+    "rLength": 16,
+    "rWidth": 16,
+    "safetyMargin": 1,
+    "maxAcceleration": 30,
+    "maxDeceleration": 30
+  },
+  "activePaths": [
+    "startPath",
+    "line-reloading-start",
+    "line-load-garden",
+    "line-opposite-shooting"
+  ]
+}

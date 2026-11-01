@@ -96,6 +96,8 @@ class OdometrySubsystem(private val robot: RobotHardware) {
     }
 
     fun resetPosition(x: Double = 0.0, y: Double = 0.0, headingDeg: Double = 0.0) {
-        robot.pinpoint?.position = Pose2D(DistanceUnit.INCH, x, y, AngleUnit.DEGREES, headingDeg)
+        robot.pinpoint?.setPosition(Pose2D(DistanceUnit.INCH, x, y, AngleUnit.DEGREES, headingDeg))
+        robot.pinpoint?.update()
+        refreshOnce()
     }
 }
