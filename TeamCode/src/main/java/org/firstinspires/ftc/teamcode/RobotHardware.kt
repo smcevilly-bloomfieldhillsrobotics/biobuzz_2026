@@ -150,7 +150,7 @@ class RobotHardware {
         }
 
         leftIntakeServo = tryGetCRServo(hardwareMap, *LEFT_INTAKE_SERVO_NAMES)?.apply {
-            direction = DcMotorSimple.Direction.REVERSE
+            direction = DcMotorSimple.Direction.FORWARD
             power = 0.0
         }
 
@@ -160,7 +160,7 @@ class RobotHardware {
         }
 
         leftServo = (tryGetCRServo(hardwareMap, *LEFT_SERVO_NAMES) ?: leftIntakeServo)?.apply {
-            direction = DcMotorSimple.Direction.REVERSE
+            direction = DcMotorSimple.Direction.FORWARD
             power = 0.0
         }
 
