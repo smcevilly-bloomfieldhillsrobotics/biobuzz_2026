@@ -29,10 +29,10 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
 
     @Config
     companion object {
-        @JvmField var TARGET_VELOCITY = 1200.0
-        @JvmField var MIN_VELOCITY = 1150.0
-        @JvmField var LAUNCHER_2_TARGET_VELOCITY = 1300.0
-        @JvmField var LAUNCHER_2_MIN_VELOCITY = 1250.0
+        @JvmField var TARGET_VELOCITY = 1550.0
+        @JvmField var MIN_VELOCITY = 1500.0
+        @JvmField var LAUNCHER_2_TARGET_VELOCITY = 1550.0
+        @JvmField var LAUNCHER_2_MIN_VELOCITY = 1500.0
     }
 
     var intakePower: Double = 0.0
@@ -76,6 +76,8 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
         val launcherForward = rightTrigger > 0.1f
         val launcherReverse = leftTrigger > 0.1f
 
+        var servoPower = 0.0
+
         val windmillPower = if (launcherForward) {
             robot.launcher?.velocity = TARGET_VELOCITY
             robot.launcher2?.velocity = LAUNCHER_2_TARGET_VELOCITY
@@ -83,9 +85,11 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
             val currentVel = robot.launcher?.velocity ?: 0.0
             val currentVel2 = robot.launcher2?.velocity ?: 0.0
 
+            // Left and right servos run ONLY when launchers reach the correct speed / position
             if (currentVel > MIN_VELOCITY && currentVel2 > LAUNCHER_2_MIN_VELOCITY) {
                 intakePower = (intakePower + 0.5).coerceIn(-1.0, 1.0)
                 robot.intake?.let { it.power = intakePower }
+                servoPower = 1.0
                 1.0
             } else {
                 0.0
@@ -93,16 +97,24 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
         } else if (launcherReverse) {
             robot.launcher?.velocity = -TARGET_VELOCITY
             robot.launcher2?.velocity = -LAUNCHER_2_TARGET_VELOCITY
+            servoPower = -1.0
             -1.0
         } else {
             robot.launcher?.velocity = 0.0
             robot.launcher2?.velocity = 0.0
             if (leftBumper) {
+                servoPower = -1.0
                 -1.0
             } else {
                 0.0
             }
         }
+
+        // Apply power to left and right servos (and intake servos)
+        robot.leftServo?.power = servoPower
+        robot.rightServo?.power = servoPower
+        robot.leftIntakeServo?.power = if (servoPower != 0.0) servoPower else intakePower
+        robot.rightIntakeServo?.power = if (servoPower != 0.0) servoPower else intakePower
 
         robot.windmillServo?.let { it.power = windmillPower }
     }
@@ -112,6 +124,8 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
         robot.intake?.power = 0.0
         robot.leftIntakeServo?.power = 0.0
         robot.rightIntakeServo?.power = 0.0
+        robot.leftServo?.power = 0.0
+        robot.rightServo?.power = 0.0
         robot.launcher?.velocity = 0.0
         robot.launcher2?.velocity = 0.0
         robot.windmillServo?.power = 0.0

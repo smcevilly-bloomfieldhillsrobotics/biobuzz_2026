@@ -50,8 +50,10 @@ class RobotHardware {
         val LAUNCHER_2_NAMES = arrayOf("launcher2", "launcher_motor_2", "motor4", "launcher_2")
         val CAMERA_MOTOR_NAMES = arrayOf("camera_motor", "motor3", "motor_3", "cameraMotor", "pan_motor")
         val WINDMILL_SERVO_NAMES = arrayOf("windmill", "windmillServo", "servo0")
-        val LEFT_INTAKE_SERVO_NAMES = arrayOf("left_intake_servo", "leftIntakeServo", "servo1")
-        val RIGHT_INTAKE_SERVO_NAMES = arrayOf("right_intake_servo", "rightIntakeServo", "servo2")
+        val LEFT_INTAKE_SERVO_NAMES = arrayOf("left_intake_servo", "leftIntakeServo", "servo1", "left_servo", "leftServo")
+        val RIGHT_INTAKE_SERVO_NAMES = arrayOf("right_intake_servo", "rightIntakeServo", "servo2", "right_servo", "rightServo")
+        val LEFT_SERVO_NAMES = arrayOf("left_servo", "leftServo", "servo3", "left_launcher_servo", "leftLauncherServo")
+        val RIGHT_SERVO_NAMES = arrayOf("right_servo", "rightServo", "servo4", "right_launcher_servo", "rightLauncherServo")
         val LIMELIGHT_NAMES = arrayOf("limelight", "limelight3a", "camera")
         val PINPOINT_NAMES = arrayOf("pinpoint", "odometry", "pinpoint_odom")
     }
@@ -69,6 +71,8 @@ class RobotHardware {
     var windmillServo: CRServo? = null
     var leftIntakeServo: CRServo? = null
     var rightIntakeServo: CRServo? = null
+    var leftServo: CRServo? = null
+    var rightServo: CRServo? = null
     var limelight: Limelight3A? = null
     var pinpoint: GoBildaPinpointDriver? = null
 
@@ -105,7 +109,7 @@ class RobotHardware {
         }
 
         frontRightDrive = tryGetMotor(hardwareMap, *FRONT_RIGHT_DRIVE_NAMES)?.apply {
-            direction = DcMotorSimple.Direction.REVERSE
+            direction = DcMotorSimple.Direction.FORWARD
             zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
             mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         }
@@ -117,7 +121,7 @@ class RobotHardware {
         }
 
         backRightDrive = tryGetMotor(hardwareMap, *BACK_RIGHT_DRIVE_NAMES)?.apply {
-            direction = DcMotorSimple.Direction.FORWARD
+            direction = DcMotorSimple.Direction.REVERSE
             zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
             mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         }
@@ -151,6 +155,16 @@ class RobotHardware {
         }
 
         rightIntakeServo = tryGetCRServo(hardwareMap, *RIGHT_INTAKE_SERVO_NAMES)?.apply {
+            direction = DcMotorSimple.Direction.REVERSE
+            power = 0.0
+        }
+
+        leftServo = (tryGetCRServo(hardwareMap, *LEFT_SERVO_NAMES) ?: leftIntakeServo)?.apply {
+            direction = DcMotorSimple.Direction.REVERSE
+            power = 0.0
+        }
+
+        rightServo = (tryGetCRServo(hardwareMap, *RIGHT_SERVO_NAMES) ?: rightIntakeServo)?.apply {
             direction = DcMotorSimple.Direction.REVERSE
             power = 0.0
         }
