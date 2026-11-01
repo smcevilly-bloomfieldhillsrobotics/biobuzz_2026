@@ -1,8 +1,11 @@
 package org.firstinspires.ftc.teamcode
 
 import com.acmerobotics.dashboard.FtcDashboard
+import com.acmerobotics.dashboard.canvas.Canvas
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
+import com.acmerobotics.roadrunner.Action
+import com.acmerobotics.roadrunner.Pose2d
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
@@ -16,12 +19,9 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Autonomous OpMode for BioBuzz StarterBot (Tank Drive) using goBILDA Pinpoint Odometry
- * and Limelight 3A AprilTag targeting.
- *
- * Drives to field waypoints, checks if the Limelight camera is live and an AprilTag is detected,
- * and if detected, smoothly aligns and approaches the AprilTag to a calibrated target distance,
- * then returns to (0, 0).
+ * Autonomous OpMode for BioBuzz StarterBot (Tank Drive) using goBILDA Pinpoint Odometry,
+ * RoadRunner 1.0 trajectory following (with waypoint fallback), Limelight 3A AprilTag targeting,
+ * and launcher sequencing before initiating path navigation.
  */
 @Autonomous(name = "BioBuzz Autonomous (Drive to Target)", group = "Autonomous")
 class RoadRunnerAutoOpMode : LinearOpMode() {
@@ -37,6 +37,8 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
 
     private val robot = RobotHardware()
     private lateinit var drive: RoadRunnerTankDrive
+    private var tankDrive: TankDrive? = null
+    private var paths: RoadRunnerPaths? = null
     private var currentStep = "Initializing"
 
     override fun runOpMode() {
@@ -46,15 +48,22 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
         robot.init(hardwareMap)
         drive = RoadRunnerTankDrive(robot)
 
-        // Reset starting odometry pose to initial field position (56.0, 8.0, 0.0 rad)
-        robot.pinpoint?.setPosition(
-            Pose2D(
-                DistanceUnit.INCH,
-                56.0,
-                8.0,
-                AngleUnit.DEGREES,
-                0.0
-            )
+        // Try initializing TankDrive for RoadRunner trajectory action execution
+        try {
+            tankDrive = TankDrive(hardwareMap, Pose2d(56.0, 8.0, Math.toRadians(90.0)))
+            paths = RoadRunnerPaths(tankDrive!!)
+        } catch (_: Exception) {
+            tankDrive = null
+            paths = null
+        }
+
+        // Reset starting odometry pose to initial field position (56.0, 8.0, 90.0 deg) defined in RoadRunnerPaths
+        robot.pinpoint?.position = Pose2D(
+            DistanceUnit.INCH,
+            56.0,
+            8.0,
+            AngleUnit.DEGREES,
+            90.0
         )
 
         currentStep = "Ready (Waiting for Start)"
@@ -65,34 +74,78 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
 
         if (!opModeIsActive()) return
 
-        // Step 1: Drive forward 30 inches on the field
-        currentStep = "1: Driving forward 30 in"
-        updateAutoTelemetry(56.0, 8.0, 0.0)
-        driveStraightInches(targetDistanceInches = 30.0, speed = 0.5)
+        // --- Step 0: Execute Launcher Function BEFORE initiating drive ---
+        currentStep = "0: Launching game elements"
+        updatePoseAndTelemetry()
+        executeLaunchSequence(launchDurationMs = 2500)
+        sleep(200)
 
-        sleep(300)
-        drive.updatePose().let { updateAutoTelemetry(it.position.x, it.position.y, Math.toDegrees(it.heading.toDouble())) }
+        val rrPaths = paths
+        val rrTank = tankDrive
 
-        // Step 2: Turn 90 degrees counter-clockwise
-        currentStep = "2: Turning 90°"
-        turnDegrees(targetAngleDegrees = 90.0, speed = 0.4)
+        if ((rrPaths != null) && (rrTank != null)) {
+            // Path 1: Drive to Shooting Position (56.0, 36.0, 90°)
+            currentStep = "1: Following Path -> Shooting Position (56.0, 36.0)"
+            updatePoseAndTelemetry()
+            runBlockingAction(rrPaths.shootingPositionPath())
+            sleep(300)
 
-        sleep(300)
-        drive.updatePose().let { updateAutoTelemetry(it.position.x, it.position.y, Math.toDegrees(it.heading.toDouble())) }
+            // Optional: Tag alignment & approach at shooting position
+            currentStep = "Limelight AprilTag Align & Approach"
+            approachAprilTagIfDetected(targetDistanceInches = DESIRED_TAG_DISTANCE_INCHES, timeoutSec = 3.0)
+            sleep(200)
 
-        // Step 3: Drive forward another 20 inches to target area
-        currentStep = "3: Driving forward 20 in"
-        driveStraightInches(targetDistanceInches = 20.0, speed = 0.5)
+            // Path 2: Drive to Reloading Start (34.80, 10.97, 180°)
+            currentStep = "2: Following Path -> Reloading Start (34.80, 10.97)"
+            updatePoseAndTelemetry()
+            runBlockingAction(rrPaths.reloadingStartPath())
+            sleep(300)
 
-        // Step 4: Check if Limelight is live and leverage AprilTag to approach
-        currentStep = "4: Limelight AprilTag Align & Approach"
-        approachAprilTagIfDetected(targetDistanceInches = DESIRED_TAG_DISTANCE_INCHES, timeoutSec = 5.0)
+            // Path 3: Drive reverse to Load Garden (0.83, 14.19, -5.42°)
+            currentStep = "3: Following Path -> Load Garden (0.83, 14.19)"
+            updatePoseAndTelemetry()
+            runBlockingAction(rrPaths.loadGardenPath())
+            sleep(300)
 
-        // Step 5: Navigate back to (0, 0)
-        currentStep = "5: Driving to (0, 0)"
-        driveToPoint(targetX = 0.0, targetY = 0.0, speed = 0.5)
+            // Path 4: Drive to Opposite Shooting Position (52.82, 126.89, 270°)
+            currentStep = "4: Following Path -> Opposite Shooting (52.82, 126.89)"
+            updatePoseAndTelemetry()
+            runBlockingAction(rrPaths.oppositeShootingPositionPath())
+            sleep(300)
 
-        currentStep = "Complete! Holding position at (0, 0)"
+        } else {
+            // Fallback waypoint navigation directly visiting each pose defined in RoadRunnerPaths:
+            // 1) shootingPosition: (56.0, 36.0)
+            // 2) reloadingStart: (34.8008, 10.97)
+            // 3) loadGarden: (0.8333, 14.1918)
+            // 4) oppositeShootingPosition: (52.8239, 126.8941)
+
+            currentStep = "1: Moving to Shooting Position (56.0, 36.0)"
+            driveToPoint(targetX = 56.0, targetY = 36.0, speed = 0.5)
+            turnToHeading(targetAngleDegrees = 90.0, speed = 0.4)
+            sleep(300)
+
+            currentStep = "Limelight AprilTag Align & Approach"
+            approachAprilTagIfDetected(targetDistanceInches = DESIRED_TAG_DISTANCE_INCHES, timeoutSec = 3.0)
+            sleep(200)
+
+            currentStep = "2: Moving to Reloading Start (34.80, 10.97)"
+            driveToPoint(targetX = 34.8008, targetY = 10.97, speed = 0.5)
+            turnToHeading(targetAngleDegrees = 180.0, speed = 0.4)
+            sleep(300)
+
+            currentStep = "3: Moving to Load Garden (0.83, 14.19)"
+            driveToPoint(targetX = 0.8333, targetY = 14.1918, speed = 0.5)
+            turnToHeading(targetAngleDegrees = -5.4183, speed = 0.4)
+            sleep(300)
+
+            currentStep = "4: Moving to Opposite Shooting (52.82, 126.89)"
+            driveToPoint(targetX = 52.8239, targetY = 126.8941, speed = 0.5)
+            turnToHeading(targetAngleDegrees = 270.0, speed = 0.4)
+            sleep(300)
+        }
+
+        currentStep = "Complete! Holding final position"
 
         // Keep updating telemetry & dashboard while active
         while (opModeIsActive()) {
@@ -102,6 +155,75 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
         }
 
         drive.stop()
+    }
+
+    /**
+     * Spins up the dual launcher flywheel motors, feeds elements via the windmill servo and intake,
+     * and stops all launcher motors after firing.
+     */
+    private fun executeLaunchSequence(launchDurationMs: Long = 2500) {
+        val targetVel1 = IntakeLauncherSubsystem.TARGET_VELOCITY
+        val minVel1 = IntakeLauncherSubsystem.MIN_VELOCITY
+        val targetVel2 = IntakeLauncherSubsystem.LAUNCHER_2_TARGET_VELOCITY
+        val minVel2 = IntakeLauncherSubsystem.LAUNCHER_2_MIN_VELOCITY
+
+        // 1. Spin up launcher flywheels
+        robot.launcher?.velocity = targetVel1
+        robot.launcher2?.velocity = targetVel2
+
+        val startTime = System.currentTimeMillis()
+        var flywheelsReady = false
+
+        while (opModeIsActive() && (System.currentTimeMillis() - startTime) < launchDurationMs) {
+            val v1 = robot.launcher?.velocity ?: 0.0
+            val v2 = robot.launcher2?.velocity ?: 0.0
+
+            // Once flywheels reach minimum velocity, feed with windmill & intake
+            if (!flywheelsReady && (v1 > minVel1 || v2 > minVel2 || (System.currentTimeMillis() - startTime) > 800)) {
+                flywheelsReady = true
+            }
+
+            if (flywheelsReady) {
+                robot.windmillServo?.power = 1.0
+                robot.intake?.power = 0.8
+                robot.leftIntakeServo?.power = 0.8
+                robot.rightIntakeServo?.power = 0.8
+            }
+
+            updatePoseAndTelemetry()
+            sleep(20)
+        }
+
+        // 2. Stop launcher, windmill, and intake
+        robot.launcher?.velocity = 0.0
+        robot.launcher2?.velocity = 0.0
+        robot.windmillServo?.power = 0.0
+        robot.intake?.power = 0.0
+        robot.leftIntakeServo?.power = 0.0
+        robot.rightIntakeServo?.power = 0.0
+    }
+
+    private fun runBlockingAction(action: Action) {
+        val dash = FtcDashboard.getInstance()
+        val c = Canvas()
+        action.preview(c)
+
+        var running = true
+        while (running && opModeIsActive()) {
+            val packet = TelemetryPacket()
+            packet.fieldOverlay().operations.addAll(c.operations)
+            running = action.run(packet)
+            dash.sendTelemetryPacket(packet)
+
+            val currentPose = drive.updatePose()
+            updateAutoTelemetry(currentPose.position.x, currentPose.position.y, Math.toDegrees(currentPose.heading.toDouble()))
+        }
+        drive.stop()
+    }
+
+    private fun updatePoseAndTelemetry() {
+        val currentPose = drive.updatePose()
+        updateAutoTelemetry(currentPose.position.x, currentPose.position.y, Math.toDegrees(currentPose.heading.toDouble()))
     }
 
     /**
@@ -189,7 +311,7 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
      * Leverages the live Limelight AprilTag detection to align and approach the tag
      * until the robot reaches [targetDistanceInches].
      */
-    private fun approachAprilTagIfDetected(targetDistanceInches: Double, timeoutSec: Double = 5.0) {
+    private fun approachAprilTagIfDetected(targetDistanceInches: Double, timeoutSec: Double = 3.0) {
         val startTime = System.currentTimeMillis()
         var tagSeen = false
 
@@ -259,45 +381,9 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
     }
 
     /**
-     * Drives straight using closed-loop odometry feedback.
+     * Turns in place to an absolute target field heading (in degrees) using odometry IMU heading.
      */
-    private fun driveStraightInches(targetDistanceInches: Double, speed: Double, timeoutSec: Double = 5.0) {
-        val startPose = drive.updatePose()
-        val startX = startPose.position.x
-        val startY = startPose.position.y
-        val targetHeading = startPose.heading.toDouble()
-        val startTime = System.currentTimeMillis()
-
-        while (opModeIsActive() && (System.currentTimeMillis() - startTime) < (timeoutSec * 1000)) {
-            val pose = drive.updatePose()
-            val distanceTraveled = hypot(pose.position.x - startX, pose.position.y - startY)
-
-            updateAutoTelemetry(pose.position.x, pose.position.y, Math.toDegrees(pose.heading.toDouble()))
-
-            if (distanceTraveled >= targetDistanceInches) break
-
-            // Simple P-controller on heading to keep driving in a straight line
-            var headingError = targetHeading - pose.heading.toDouble()
-            while (headingError > Math.PI) headingError -= 2 * Math.PI
-            while (headingError < -Math.PI) headingError += 2 * Math.PI
-
-            val headingCorrection = (headingError * 0.8).coerceIn(-0.3, 0.3)
-            val leftPower = (speed - headingCorrection).coerceIn(-1.0, 1.0)
-            val rightPower = (speed + headingCorrection).coerceIn(-1.0, 1.0)
-
-            drive.setDrivePowers(leftPower, rightPower)
-        }
-
-        drive.stop()
-    }
-
-    /**
-     * Turns in place to a relative target angle using the odometry IMU heading.
-     */
-    private fun turnDegrees(targetAngleDegrees: Double, speed: Double, timeoutSec: Double = 4.0) {
-        val startPose = drive.updatePose()
-        val startHeadingDeg = Math.toDegrees(startPose.heading.toDouble())
-        val targetHeadingDeg = startHeadingDeg + targetAngleDegrees
+    private fun turnToHeading(targetAngleDegrees: Double, speed: Double, timeoutSec: Double = 4.0) {
         val startTime = System.currentTimeMillis()
 
         while (opModeIsActive() && (System.currentTimeMillis() - startTime) < (timeoutSec * 1000)) {
@@ -306,7 +392,7 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
 
             updateAutoTelemetry(pose.position.x, pose.position.y, currentHeadingDeg)
 
-            var angleError = targetHeadingDeg - currentHeadingDeg
+            var angleError = targetAngleDegrees - currentHeadingDeg
             while (angleError > 180.0) angleError -= 360.0
             while (angleError < -180.0) angleError += 360.0
 
@@ -314,6 +400,7 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
 
             val turnPower = (angleError * 0.015).coerceIn(-speed, speed)
             drive.setDrivePowers(-turnPower, turnPower)
+            sleep(20)
         }
 
         drive.stop()

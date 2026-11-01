@@ -105,7 +105,7 @@ class RobotHardware {
         }
 
         frontRightDrive = tryGetMotor(hardwareMap, *FRONT_RIGHT_DRIVE_NAMES)?.apply {
-            direction = DcMotorSimple.Direction.FORWARD
+            direction = DcMotorSimple.Direction.REVERSE
             zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
             mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         }
