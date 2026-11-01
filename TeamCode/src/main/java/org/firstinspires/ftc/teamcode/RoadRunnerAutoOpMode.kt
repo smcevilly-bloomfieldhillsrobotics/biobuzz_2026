@@ -74,12 +74,6 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
 
         if (!opModeIsActive()) return
 
-        // --- Step 0: Execute Launcher Function BEFORE initiating drive ---
-        currentStep = "0: Launching game elements"
-        updatePoseAndTelemetry()
-        executeLaunchSequence(launchDurationMs = 2500)
-        sleep(200)
-
         val rrPaths = paths
         val rrTank = tankDrive
 
@@ -90,10 +84,22 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
             runBlockingAction(rrPaths.shootingPositionPath())
             sleep(300)
 
-            // Optional: Tag alignment & approach at shooting position
+            // Limelight AprilTag Align & Approach at Shooting Position
             currentStep = "Limelight AprilTag Align & Approach"
-            approachAprilTagIfDetected(targetDistanceInches = DESIRED_TAG_DISTANCE_INCHES, timeoutSec = 3.0)
+            val tagDetected = approachAprilTagIfDetected(targetDistanceInches = DESIRED_TAG_DISTANCE_INCHES, timeoutSec = 3.0)
             sleep(200)
+
+            // Execute Launcher Function ONLY IF AprilTag is detected
+            if (tagDetected) {
+                currentStep = "Launching game elements at Shooting Position (AprilTag Confirmed)"
+                updatePoseAndTelemetry()
+                executeLaunchSequence(launchDurationMs = 2500, requireAprilTag = true)
+                sleep(200)
+            } else {
+                currentStep = "Skipping Shooting: No AprilTag Detected in Field View"
+                updatePoseAndTelemetry()
+                sleep(1000)
+            }
 
             // Path 2: Drive to Reloading Start (34.80, 10.97, 180°)
             currentStep = "2: Following Path -> Reloading Start (34.80, 10.97)"
@@ -129,6 +135,16 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
             approachAprilTagIfDetected(targetDistanceInches = DESIRED_TAG_DISTANCE_INCHES, timeoutSec = 3.0)
             sleep(200)
 
+            currentStep = "Launching game elements at Shooting Position"
+            updatePoseAndTelemetry()
+            executeLaunchSequence(launchDurationMs = 2500)
+            sleep(200)
+
+            currentStep = "2: Moving to Reloading Start (34.80, 10.97)"
+            driveToPoint(targetX = 34.8008, targetY = 10.97, speed = 0.5)
+            turnToHeading(targetAngleDegrees = 180.0, speed = 0.4)
+            sleep(300)
+
             currentStep = "2: Moving to Reloading Start (34.80, 10.97)"
             driveToPoint(targetX = 34.8008, targetY = 10.97, speed = 0.5)
             turnToHeading(targetAngleDegrees = 180.0, speed = 0.4)
@@ -160,8 +176,19 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
     /**
      * Spins up the dual launcher flywheel motors, feeds elements via the windmill servo and intake,
      * and stops all launcher motors after firing.
+     * Requires AprilTag visibility check so launcher will NOT fire if no AprilTag is detected.
      */
-    private fun executeLaunchSequence(launchDurationMs: Long = 2500) {
+    private fun executeLaunchSequence(launchDurationMs: Long = 2500, requireAprilTag: Boolean = true) {
+        if (requireAprilTag) {
+            val tag = getAprilTagTarget()
+            if (tag == null || !tag.isValid) {
+                currentStep = "Launch Aborted: No AprilTag Detected!"
+                updatePoseAndTelemetry()
+                sleep(500)
+                return
+            }
+        }
+
         val targetVel1 = IntakeLauncherSubsystem.TARGET_VELOCITY
         val minVel1 = IntakeLauncherSubsystem.MIN_VELOCITY
         val targetVel2 = IntakeLauncherSubsystem.LAUNCHER_2_TARGET_VELOCITY
@@ -315,8 +342,9 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
     /**
      * Leverages the live Limelight AprilTag detection to align and approach the tag
      * until the robot reaches [targetDistanceInches].
+     * Returns true if an AprilTag target was detected and approached, false otherwise.
      */
-    private fun approachAprilTagIfDetected(targetDistanceInches: Double, timeoutSec: Double = 3.0) {
+    private fun approachAprilTagIfDetected(targetDistanceInches: Double, timeoutSec: Double = 3.0): Boolean {
         val startTime = System.currentTimeMillis()
         var tagSeen = false
 
@@ -383,6 +411,7 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
 
         drive.stop()
         telemetry.update()
+        return tagSeen
     }
 
     /**

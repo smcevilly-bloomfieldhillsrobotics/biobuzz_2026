@@ -22,6 +22,8 @@
 
 package org.firstinspires.ftc.teamcode
 
+import com.pedropathing.revhub.drivetrains.Mecanum
+import com.pedropathing.revhub.drivetrains.MecanumConfig
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver
 import com.qualcomm.hardware.limelightvision.Limelight3A
 import com.qualcomm.robotcore.hardware.CRServo
@@ -125,6 +127,35 @@ class RobotHardware {
             zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
             mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         }
+    }
+
+    /**
+     * Centralized Pedro Pathing Mecanum Drivetrain factory.
+     * Reuses motor instances, configurations, and directions defined in RobotHardware.
+     */
+    fun createPedroMecanum(hardwareMap: HardwareMap): Mecanum {
+        if (frontLeftDrive == null || frontRightDrive == null || backLeftDrive == null || backRightDrive == null) {
+            initMecanumDrivetrain(hardwareMap)
+        }
+
+        val flName = frontLeftDrive?.let { hardwareMap.getNamesOf(it).firstOrNull() } ?: FRONT_LEFT_DRIVE_NAMES[0]
+        val frName = frontRightDrive?.let { hardwareMap.getNamesOf(it).firstOrNull() } ?: FRONT_RIGHT_DRIVE_NAMES[0]
+        val blName = backLeftDrive?.let { hardwareMap.getNamesOf(it).firstOrNull() } ?: BACK_LEFT_DRIVE_NAMES[0]
+        val brName = backRightDrive?.let { hardwareMap.getNamesOf(it).firstOrNull() } ?: BACK_RIGHT_DRIVE_NAMES[0]
+
+        val config = MecanumConfig { c ->
+            c.frontLeftName.set(flName)
+            c.frontRightName.set(frName)
+            c.backLeftName.set(blName)
+            c.backRightName.set(brName)
+
+            c.frontLeftDirection.set(frontLeftDrive?.direction ?: DcMotorSimple.Direction.REVERSE)
+            c.frontRightDirection.set(frontRightDrive?.direction ?: DcMotorSimple.Direction.REVERSE)
+            c.backLeftDirection.set(backLeftDrive?.direction ?: DcMotorSimple.Direction.REVERSE)
+            c.backRightDirection.set(backRightDrive?.direction ?: DcMotorSimple.Direction.FORWARD)
+        }
+
+        return Mecanum(hardwareMap, config)
     }
 
     fun initIntakeAndLauncher(hardwareMap: HardwareMap) {

@@ -5,12 +5,12 @@ import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 import com.pedropathing.drivetrain.DrivePowers
 import com.pedropathing.revhub.drivetrains.Mecanum
-import com.pedropathing.revhub.drivetrains.MecanumConfig
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
-import com.qualcomm.robotcore.hardware.DcMotorSimple
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * BioBuzz Mecanum TeleOp powered directly by Pedro Pathing's Mecanum Drivetrain & Pinpoint Odometry.
@@ -42,25 +42,7 @@ class BioBuzzMecanumTeleop : OpMode() {
         robot.initLimelight(hardwareMap)
         robot.initPinpoint(hardwareMap)
 
-        // Find configured hardware names for the 4 mecanum drive motors
-        val flName = robot.frontLeftDrive?.let { hardwareMap.getNamesOf(it).firstOrNull() } ?: "front_left_drive"
-        val frName = robot.frontRightDrive?.let { hardwareMap.getNamesOf(it).firstOrNull() } ?: "front_right_drive"
-        val blName = robot.backLeftDrive?.let { hardwareMap.getNamesOf(it).firstOrNull() } ?: "back_left_drive"
-        val brName = robot.backRightDrive?.let { hardwareMap.getNamesOf(it).firstOrNull() } ?: "back_right_drive"
-
-        // Initialize Pedro Pathing's Mecanum Drivetrain
-        val config = MecanumConfig { c ->
-            c.frontLeftName.set(flName)
-            c.frontRightName.set(frName)
-            c.backLeftName.set(blName)
-            c.backRightName.set(brName)
-
-            c.frontLeftDirection.set(robot.frontLeftDrive?.direction ?: DcMotorSimple.Direction.REVERSE)
-            c.frontRightDirection.set(robot.frontRightDrive?.direction ?: DcMotorSimple.Direction.FORWARD)
-            c.backLeftDirection.set(robot.backLeftDrive?.direction ?: DcMotorSimple.Direction.REVERSE)
-            c.backRightDirection.set(robot.backRightDrive?.direction ?: DcMotorSimple.Direction.REVERSE)
-        }
-        pedroMecanum = Mecanum(hardwareMap, config)
+        pedroMecanum = robot.createPedroMecanum(hardwareMap)
 
         intakeLauncher = IntakeLauncherSubsystem(robot)
         odometry = OdometrySubsystem(robot)
@@ -74,7 +56,7 @@ class BioBuzzMecanumTeleop : OpMode() {
     override fun loop() {
         // Driver 1: Holonomic Mecanum Drive (Pedro Pathing DrivePowers)
         val forward = -gamepad1.left_stick_y.toDouble()
-        val strafe = gamepad1.left_stick_x.toDouble()
+        val strafe = -gamepad1.left_stick_x.toDouble() // Negated so gamepad right = right strafe in Pedro Pathing
         val rotate = gamepad1.right_stick_x.toDouble()
 
         // Toggle Field-Centric drive mode with Gamepad 1 A
@@ -153,6 +135,14 @@ class BioBuzzMecanumTeleop : OpMode() {
         packet.put("BL Power", blPower)
         packet.put("BR Power", brPower)
 
+        // Limelight AprilTag Detection
+        val aprilTag = getAprilTagTarget()
+        if (aprilTag != null && aprilTag.isValid) {
+            packet.put("AprilTag ID", aprilTag.id)
+            packet.put("AprilTag Distance (in)", aprilTag.distanceInches)
+            packet.put("AprilTag Offset (°)", aprilTag.txDegrees)
+        }
+
         odometry.update(packet)
         FtcDashboard.getInstance().sendTelemetryPacket(packet)
 
@@ -166,11 +156,64 @@ class BioBuzzMecanumTeleop : OpMode() {
         telemetry.addData("Right Launcher Vel", "%.1f ticks/sec (Target: %.0f)", rightLauncherVel, IntakeLauncherSubsystem.TARGET_VELOCITY)
         telemetry.addData("Left Launcher Vel", "%.1f ticks/sec (Target: %.0f)", leftLauncherVel, IntakeLauncherSubsystem.LAUNCHER_2_TARGET_VELOCITY)
         telemetry.addData("Intake Power", "%.2f", intakeLauncher.intakePower)
+
+        // Limelight AprilTag Telemetry
+        if (aprilTag != null && aprilTag.isValid) {
+            val tagStr = if (aprilTag.id >= 0) "#${aprilTag.id}" else "Lock"
+            telemetry.addData("Limelight AprilTag", "%s | Distance: %.1f in | Offset: %.1f°",
+                tagStr, aprilTag.distanceInches, aprilTag.txDegrees)
+        } else {
+            telemetry.addData("Limelight AprilTag", "No AprilTag Target Detected")
+        }
+
         telemetry.addData("--- Odometry (Pinpoint / Pedro) ---", "")
         telemetry.addData("X Position (in)", "%.2f", odometry.posX)
         telemetry.addData("Y Position (in)", "%.2f", odometry.posY)
         telemetry.addData("Heading (deg)", "%.2f", odometry.heading)
         telemetry.update()
+    }
+
+    data class AprilTagTarget(
+        val id: Int,
+        val txDegrees: Double,
+        val distanceInches: Double,
+        val isValid: Boolean
+    )
+
+    private fun getAprilTagTarget(): AprilTagTarget? {
+        val limelight = robot.limelight ?: return null
+        val status = limelight.status ?: return null
+        if (status.fps <= 0.0) return null
+
+        val result = limelight.latestResult ?: return null
+        if (!result.isValid) return null
+
+        val fiducials = result.fiducialResults
+        if (fiducials.isNullOrEmpty()) {
+            if (result.tx != 0.0 || result.ty != 0.0) {
+                val botpose = result.botpose
+                val distInches = if (botpose != null) hypot(botpose.position.x, botpose.position.y) * 39.3701 else 0.0
+                return AprilTagTarget(id = -1, txDegrees = result.tx, distanceInches = distInches, isValid = true)
+            }
+            return null
+        }
+
+        var bestTag: AprilTagTarget? = null
+        var minDistance = Double.MAX_VALUE
+
+        for (fr in fiducials) {
+            val pose = fr.targetPoseCameraSpace
+            val distInches = if (pose != null) sqrt(pose.position.x * pose.position.x + pose.position.y * pose.position.y + pose.position.z * pose.position.z) * 39.3701 else 0.0
+
+            if (distInches > 0.0 && distInches < minDistance) {
+                minDistance = distInches
+                bestTag = AprilTagTarget(id = fr.fiducialId, txDegrees = fr.targetXDegrees, distanceInches = distInches, isValid = true)
+            } else if (bestTag == null) {
+                bestTag = AprilTagTarget(id = fr.fiducialId, txDegrees = fr.targetXDegrees, distanceInches = distInches, isValid = true)
+            }
+        }
+
+        return bestTag
     }
 
     override fun stop() {

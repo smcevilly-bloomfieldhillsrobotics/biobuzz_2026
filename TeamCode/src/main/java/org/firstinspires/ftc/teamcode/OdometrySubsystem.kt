@@ -38,9 +38,11 @@ import kotlin.math.sin
 class OdometrySubsystem(private val robot: RobotHardware) {
 
     companion object {
-        // Pod offsets in millimeters (GoBilda 4-bar odometry pods)
-        const val X_POD_OFFSET_MM = -84.0
-        const val Y_POD_OFFSET_MM = -168.0
+        // Pod offsets for goBILDA Pinpoint Odometry Computer:
+        // X Pod (Forward pod): Centered on X axis = 0.0 mm
+        // Y Pod (Strafe pod): 8.0 inches Backward from center = -203.2 mm
+        const val X_POD_OFFSET_MM = 0.0
+        const val Y_POD_OFFSET_MM = -203.2
     }
 
     var posX = 0.0
@@ -54,6 +56,19 @@ class OdometrySubsystem(private val robot: RobotHardware) {
 
     init {
         isInitialized = robot.pinpoint != null
+    }
+
+    /**
+     * Force an immediate read of the position so posX, posY, and heading are immediately populated
+     * rather than waiting for the first external update() call.
+     */
+    fun refreshOnce() {
+        val pinpoint = robot.pinpoint ?: return
+        pinpoint.update()
+        val pose = pinpoint.position
+        posX = pose.getX(DistanceUnit.INCH)
+        posY = pose.getY(DistanceUnit.INCH)
+        heading = pose.getHeading(AngleUnit.DEGREES)
     }
 
     fun update(packet: TelemetryPacket?) {

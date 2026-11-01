@@ -2,11 +2,16 @@ package org.firstinspires.ftc.teamcode
 
 import com.acmerobotics.roadrunner.Action
 import com.acmerobotics.roadrunner.Pose2d
+import com.pedropathing.paths.Path
 
 /**
- * Defines standard paths for the autonomous routine using Road Runner 1.0.
+ * Defines standard paths for the autonomous routine using Road Runner 1.0 and Pedro Pathing 3.0.
+ * Serves as a unified path definition class for both pathing systems.
  */
 class RoadRunnerPaths(private val drive: TankDrive) {
+
+    /** Pedro Pathing 3.0 equivalent paths instance */
+    val pedroPaths = PedroPaths()
 
     // 1. Translated Poses (X, Y, Heading in radians)
     val startPose = Pose2d(56.0, 8.0, Math.toRadians(90.0))
@@ -15,35 +20,39 @@ class RoadRunnerPaths(private val drive: TankDrive) {
     val loadGarden = Pose2d(0.8333, 14.1918, Math.toRadians(-5.4183))
     val oppositeShootingPosition = Pose2d(52.8239, 126.8941, Math.toRadians(270.0))
 
-    // 2. Translated Paths
+    // 2. Road Runner Actions
 
     fun shootingPositionPath(): Action {
-        // Pedro equivalent: Paths.line(start, shootingposition).linear(start, shootingposition)
         return drive.actionBuilder(startPose)
             .lineToY(36.0) // Straight line along Y-axis, keeping 90 degree heading
             .build()
     }
 
     fun reloadingStartPath(): Action {
-        // Pedro equivalent: Paths.line(shootingposition, reloadingstart).constant(reloadingstart)
         return drive.actionBuilder(shootingPosition)
             .splineTo(reloadingStart.position, reloadingStart.heading)
             .build()
     }
 
     fun loadGardenPath(): Action {
-        // Pedro equivalent: Paths.line(reloadingstart, loadGarden).reverseTangent()
         return drive.actionBuilder(reloadingStart)
-            .setReversed(true) // Road Runner equivalent of reverseTangent()
+            .setReversed(true)
             .splineTo(loadGarden.position, loadGarden.heading)
             .build()
     }
 
     fun oppositeShootingPositionPath(): Action {
-        // Pedro equivalent: Paths.line(loadGarden, oppositeshootingposition).constant(oppositeshootingposition)
         return drive.actionBuilder(loadGarden)
-            .setReversed(false) // Ensure we are driving forward again
+            .setReversed(false)
             .splineTo(oppositeShootingPosition.position, oppositeShootingPosition.heading)
             .build()
     }
+
+    // 3. Pedro Pathing 3.0 Paths (Direct Delegate)
+
+    fun pedroShootingPositionPath(): Path = pedroPaths.shootingPositionPath()
+    fun pedroReloadingStartPath(): Path = pedroPaths.reloadingStartPath()
+    fun pedroLoadGardenPath(): Path = pedroPaths.loadGardenPath()
+    fun pedroOppositeShootingPositionPath(): Path = pedroPaths.oppositeShootingPositionPath()
 }
+
