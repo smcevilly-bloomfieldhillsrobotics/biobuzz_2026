@@ -36,10 +36,10 @@ class BioBuzzLauncherTeleop : OpMode() {
 
     override fun loop() {
         // Driver 1: Controls Intake and Launcher (for standalone testing)
-        // Right Trigger: Spin Launcher up to target velocity
-        // Left Trigger: Reverse Launcher
+        // Right Trigger: Spin Right Launcher (robot.launcher)
+        // Left Trigger: Spin Left Launcher (robot.launcher2)
         // Right Bumper: Run intake forwards
-        // Left Bumper: Reverse intake (unjam)
+        // Left Bumper: Reverse intake & servos (unjam)
         intakeLauncher.update(
             gamepad1.right_trigger,
             gamepad1.left_trigger,
@@ -80,10 +80,10 @@ class BioBuzzLauncherTeleop : OpMode() {
 
         // Telemetry
         telemetry.addData("--- BioBuzz Launcher Tuning ---", "")
-        telemetry.addData("Controls", "RT: Launcher, LT: Launcher Rev, RB: Intake, LB: Intake Rev")
-        telemetry.addData("Tuning", "D-Pad Left/Right: Launcher 1, D-Pad Up/Down: Launcher 2")
-        telemetry.addData("Launcher 1 Vel", "%.1f ticks/sec (Target: %.0f)", launcherVel, IntakeLauncherSubsystem.TARGET_VELOCITY)
-        telemetry.addData("Launcher 2 Vel", "%.1f ticks/sec (Target: %.0f)", launcher2Vel, IntakeLauncherSubsystem.LAUNCHER_2_TARGET_VELOCITY)
+        telemetry.addData("Controls", "RT: Right Launcher, LT: Left Launcher, RB: Intake, LB: Reverse/Unjam")
+        telemetry.addData("Tuning", "D-Pad Left/Right: Right Launcher, D-Pad Up/Down: Left Launcher")
+        telemetry.addData("Right Launcher Vel", "%.1f ticks/sec (Target: %.0f)", launcherVel, IntakeLauncherSubsystem.TARGET_VELOCITY)
+        telemetry.addData("Left Launcher Vel", "%.1f ticks/sec (Target: %.0f)", launcher2Vel, IntakeLauncherSubsystem.LAUNCHER_2_TARGET_VELOCITY)
         telemetry.addData("Intake Power", "%.2f", intakeLauncher.intakePower)
         
         telemetry.update()

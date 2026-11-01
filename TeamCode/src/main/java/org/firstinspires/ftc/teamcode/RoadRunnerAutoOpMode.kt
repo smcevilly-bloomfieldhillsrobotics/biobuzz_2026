@@ -178,21 +178,19 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
             val v1 = robot.launcher?.velocity ?: 0.0
             val v2 = robot.launcher2?.velocity ?: 0.0
 
-            // Once flywheels reach correct velocity/position threshold, trigger left and right servos, windmill, and intake
+            // Once flywheels reach correct velocity/position threshold, trigger left servo and left intake servo
             if (!flywheelsReady && ((v1 > minVel1 && v2 > minVel2) || (System.currentTimeMillis() - startTime) > 800)) {
                 flywheelsReady = true
             }
 
             if (flywheelsReady) {
                 robot.leftServo?.power = 1.0
-                robot.rightServo?.power = 1.0
                 robot.leftIntakeServo?.power = 0.8
-                robot.rightIntakeServo?.power = 0.8
                 robot.windmillServo?.power = 1.0
                 robot.intake?.power = 0.8
             } else {
                 robot.leftServo?.power = 0.0
-                robot.rightServo?.power = 0.0
+                robot.leftIntakeServo?.power = 0.0
             }
 
             updatePoseAndTelemetry()

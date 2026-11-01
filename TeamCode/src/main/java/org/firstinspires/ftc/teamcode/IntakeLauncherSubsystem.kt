@@ -72,49 +72,54 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
         robot.leftIntakeServo?.let { it.power = intakePower }
         robot.rightIntakeServo?.let { it.power = intakePower }
 
-        // Launcher controls: Right Trigger = spin up forward, Left Trigger = spin reversed
-        val launcherForward = rightTrigger > 0.1f
-        val launcherReverse = leftTrigger > 0.1f
+        // Launcher controls:
+        // Right Trigger = Run Right Launcher (robot.launcher)
+        // Left Trigger = Run Left Launcher (robot.launcher2)
+        val rightTriggerActive = rightTrigger > 0.1f
+        val leftTriggerActive = leftTrigger > 0.1f
 
-        var servoPower = 0.0
-
-        val windmillPower = if (launcherForward) {
+        if (rightTriggerActive) {
             robot.launcher?.velocity = TARGET_VELOCITY
-            robot.launcher2?.velocity = LAUNCHER_2_TARGET_VELOCITY
-
-            val currentVel = robot.launcher?.velocity ?: 0.0
-            val currentVel2 = robot.launcher2?.velocity ?: 0.0
-
-            // Left and right servos run ONLY when launchers reach the correct speed / position
-            if (currentVel > MIN_VELOCITY && currentVel2 > LAUNCHER_2_MIN_VELOCITY) {
-                intakePower = (intakePower + 0.5).coerceIn(-1.0, 1.0)
-                robot.intake?.let { it.power = intakePower }
-                servoPower = 1.0
-                1.0
-            } else {
-                0.0
-            }
-        } else if (launcherReverse) {
-            robot.launcher?.velocity = -TARGET_VELOCITY
-            robot.launcher2?.velocity = -LAUNCHER_2_TARGET_VELOCITY
-            servoPower = -1.0
-            -1.0
         } else {
             robot.launcher?.velocity = 0.0
+        }
+
+        if (leftTriggerActive) {
+            robot.launcher2?.velocity = LAUNCHER_2_TARGET_VELOCITY
+        } else {
             robot.launcher2?.velocity = 0.0
-            if (leftBumper) {
-                servoPower = -1.0
-                -1.0
-            } else {
-                0.0
-            }
+        }
+
+        val currentVel = robot.launcher?.velocity ?: 0.0
+        val currentVel2 = robot.launcher2?.velocity ?: 0.0
+
+        var servoPower = 0.0
+        var windmillPower = 0.0
+
+        // If launcher(s) are active and reach target thresholds, trigger feeder servos
+        val launcherRunning = rightTriggerActive || leftTriggerActive
+        val flywheelsAtSpeed = (!rightTriggerActive || currentVel > MIN_VELOCITY) &&
+                               (!leftTriggerActive || currentVel2 > LAUNCHER_2_MIN_VELOCITY)
+
+        if (launcherRunning && flywheelsAtSpeed) {
+            intakePower = (intakePower + 0.5).coerceIn(-1.0, 1.0)
+            robot.intake?.let { it.power = intakePower }
+            servoPower = 1.0
+            windmillPower = 1.0
+        } else if (leftBumper) {
+            // Reverse / unjam using left bumper
+            servoPower = -1.0
+            windmillPower = -1.0
         }
 
         // Apply power to left and right servos (and intake servos)
+        // Left servo and left intake servo run once target velocity is reached
         robot.leftServo?.power = servoPower
-        robot.rightServo?.power = servoPower
         robot.leftIntakeServo?.power = if (servoPower != 0.0) servoPower else intakePower
-        robot.rightIntakeServo?.power = if (servoPower != 0.0) servoPower else intakePower
+
+        // Right servos remain driven by the standard intake commands
+        robot.rightServo?.power = if (leftBumper) -1.0 else 0.0
+        robot.rightIntakeServo?.power = intakePower
 
         robot.windmillServo?.let { it.power = windmillPower }
     }
