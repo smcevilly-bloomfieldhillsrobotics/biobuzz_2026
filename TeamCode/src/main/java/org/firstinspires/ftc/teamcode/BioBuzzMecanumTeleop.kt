@@ -23,16 +23,10 @@ class BioBuzzMecanumTeleop : OpMode() {
     private lateinit var pedroMecanum: Mecanum
     private lateinit var intakeLauncher: IntakeLauncherSubsystem
     private lateinit var odometry: OdometrySubsystem
+    private lateinit var controls: DriverControls
 
     // Field-centric vs Robot-centric toggle
     private var fieldCentric = true
-    private var lastAButton = false
-
-    // Tuning buttons edge detection
-    private var lastDpadUp = false
-    private var lastDpadDown = false
-    private var lastDpadRight = false
-    private var lastDpadLeft = false
 
     override fun init() {
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
@@ -46,6 +40,7 @@ class BioBuzzMecanumTeleop : OpMode() {
 
         intakeLauncher = IntakeLauncherSubsystem(robot)
         odometry = OdometrySubsystem(robot)
+        controls = DriverControls(GamepadEx(gamepad1), GamepadEx(gamepad2))
 
         odometry.resetPosition(0.0, 0.0, 0.0)
 
@@ -54,64 +49,52 @@ class BioBuzzMecanumTeleop : OpMode() {
     }
 
     override fun loop() {
-        // Driver 1: Holonomic Mecanum Drive (Pedro Pathing DrivePowers)
-        val forward = -gamepad1.left_stick_y.toDouble()
-        val strafe = -gamepad1.left_stick_x.toDouble() // Negated so gamepad right = right strafe in Pedro Pathing
-        val rotate = -gamepad1.right_stick_x.toDouble() // Negated so gamepad right = right rotation (CW) in Pedro Pathing
+        // Update centralized controls
+        controls.update()
 
-        // Toggle Field-Centric drive mode with Gamepad 1 A
-        if (gamepad1.a && !lastAButton) {
+        // Driver 1: Toggle Field-Centric drive mode with Gamepad 1 A
+        if (controls.toggleFieldCentric) {
             fieldCentric = !fieldCentric
         }
-        lastAButton = gamepad1.a
 
-        // Reset Heading / Odometry with BACK button
-        if (gamepad1.back) {
+        // Driver 1: Reset Heading / Odometry with BACK button
+        if (controls.resetOdometry) {
             odometry.resetPosition(0.0, 0.0, 0.0)
         }
 
-        // Apply Pedro Pathing DrivePowers (Field-Relative or Robot-Centric)
+        // Driver 1: Holonomic Drive Powers (Field-Relative or Robot-Centric)
+        val powers = controls.drivePowers
         if (fieldCentric) {
             val headingRad = Math.toRadians(odometry.heading)
-            val rotX = (strafe * cos(-headingRad)) - (forward * sin(-headingRad))
-            val rotY = (strafe * sin(-headingRad)) + (forward * cos(-headingRad))
-            pedroMecanum.drive(DrivePowers(rotY, rotX, rotate), true)
+            val rotX = (powers.strafe() * cos(-headingRad)) - (powers.forward() * sin(-headingRad))
+            val rotY = (powers.strafe() * sin(-headingRad)) + (powers.forward() * cos(-headingRad))
+            pedroMecanum.drive(DrivePowers(rotY, rotX, powers.turn()), true)
         } else {
-            pedroMecanum.drive(DrivePowers(forward, strafe, rotate), true)
+            pedroMecanum.drive(powers, true)
         }
 
         // Driver 2: Dual Launcher & Intake controls
-        // RT: Spin Right Launcher to target speed (pulses right servo for 0.2s after hitting speed)
-        // LT: Spin Left Launcher to target speed (pulses left servo for 0.2s after hitting speed)
-        // RB: Intake Forward
-        // LB: Reverse Intake & Servos (unjam)
         intakeLauncher.update(
-            gamepad2.right_trigger,
-            gamepad2.left_trigger,
-            gamepad2.right_bumper,
-            gamepad2.left_bumper
+            controls.rightLauncherTrigger,
+            controls.leftLauncherTrigger,
+            controls.intakeForward,
+            controls.intakeReverse
         )
 
         // Driver 2: Tune Launcher Velocities with D-Pad
-        // D-Pad Up/Down: Right Launcher velocity (adjustLauncher1Velocity)
-        // D-Pad Left/Right: Left Launcher velocity (adjustLauncher2Velocity)
-        if (gamepad2.dpad_up && !lastDpadUp) {
+        if (controls.launcher1VelocityUp) {
             intakeLauncher.adjustLauncher1Velocity(50.0)
         }
-        if (gamepad2.dpad_down && !lastDpadDown) {
+        if (controls.launcher1VelocityDown) {
             intakeLauncher.adjustLauncher1Velocity(-50.0)
         }
-        lastDpadUp = gamepad2.dpad_up
-        lastDpadDown = gamepad2.dpad_down
 
-        if (gamepad2.dpad_right && !lastDpadRight) {
+        if (controls.launcher2VelocityUp) {
             intakeLauncher.adjustLauncher2Velocity(50.0)
         }
-        if (gamepad2.dpad_left && !lastDpadLeft) {
+        if (controls.launcher2VelocityDown) {
             intakeLauncher.adjustLauncher2Velocity(-50.0)
         }
-        lastDpadRight = gamepad2.dpad_right
-        lastDpadLeft = gamepad2.dpad_left
 
         // Update Odometry and stream telemetry to FTC Dashboard
         val rightLauncherVel = robot.launcher?.velocity ?: 0.0
