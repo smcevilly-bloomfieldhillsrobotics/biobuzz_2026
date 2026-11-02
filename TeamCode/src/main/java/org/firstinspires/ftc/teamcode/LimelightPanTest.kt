@@ -27,6 +27,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 import com.qualcomm.robotcore.hardware.DcMotor
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
+import com.qualcomm.robotcore.eventloop.opmode.Disabled
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -36,6 +37,7 @@ import kotlin.math.sin
  * LimelightPanTest specialized for 4-tag groups where the exact center 
  * is always located between the inner pair (e.g., between tags 31 & 32, 35 & 36, etc.).
  */
+@Disabled
 @TeleOp(name = "Limelight Pan Tracking Test", group = "Test")
 class LimelightPanTest : LinearOpMode() {
 

@@ -12,6 +12,8 @@ import org.firstinspires.ftc.teamcode.RobotHardware
 import kotlin.math.cos
 import kotlin.math.sin
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled
+
 /**
  * Pedro Pathing Tuning Step 1: Odometry & Pod Direction Calibration.
  *
@@ -21,6 +23,7 @@ import kotlin.math.sin
  * 3. Rotating Counter-Clockwise -> Heading INCREASES positively (0° -> 90° -> 180°).
  * 4. Press BACK on Gamepad 1 to zero odometry at any time.
  */
+@Disabled
 @TeleOp(name = "1. Pedro Localization Test", group = "Pedro Tuning")
 class PedroLocalizationTest : LinearOpMode() {
 

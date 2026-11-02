@@ -5,8 +5,10 @@ import com.acmerobotics.dashboard.canvas.Canvas
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 import com.pedropathing.drivetrain.DrivePowers
+import com.pedropathing.math.Vector2D
 import com.pedropathing.paths.Path
 import com.pedropathing.revhub.drivetrains.Mecanum
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import kotlin.math.abs
@@ -53,6 +55,7 @@ class PedroAutoOpMode : LinearOpMode() {
         odometry = OdometrySubsystem(robot)
 
         // Initialize odometry to default startPose (56.0, 8.0, 90°)
+        // Note: paths.startPose.heading() is already in radians in Pedro Pathing (PoseFactory.degrees converts to radians internally)
         odometry.resetPosition(
             paths.startPose.x(),
             paths.startPose.y(),
@@ -65,7 +68,8 @@ class PedroAutoOpMode : LinearOpMode() {
         while (!isStarted && !isStopRequested) {
             odometry.update(null)
 
-            val pinpointOk = robot.pinpoint != null
+            val pinpointStatus = robot.pinpoint?.deviceStatus
+            val pinpointOk = robot.pinpoint != null && pinpointStatus == GoBildaPinpointDriver.DeviceStatus.READY
             val limelightStatus = robot.limelight?.status
             val limelightOk = (limelightStatus?.fps ?: 0.0) > 0.0
             val motorsOk = robot.frontLeftDrive != null && robot.frontRightDrive != null &&
@@ -82,7 +86,8 @@ class PedroAutoOpMode : LinearOpMode() {
                 pinpointOk = pinpointOk,
                 limelightOk = limelightOk,
                 motorsOk = motorsOk,
-                launchersOk = launchersOk
+                launchersOk = launchersOk,
+                pinpointStatus = pinpointStatus
             )
 
             sleep(30)
@@ -90,40 +95,49 @@ class PedroAutoOpMode : LinearOpMode() {
 
         if (!opModeIsActive()) return
 
-        // Step 1: Follow Path to Shooting Position (56.0, 36.0, 90°)
-        currentStep = "1: Following Path -> Shooting Position (56.0, 36.0)"
-        followPedroPath(paths.shootingPositionPath())
-        sleep(250)
+        // Wait up to 5 seconds to detect an AprilTag
+        currentStep = "Waiting for AprilTag (up to 5s)"
+        val tagWaitStart = System.currentTimeMillis()
+        var tagFound = false
 
-        // Step 1b: Limelight AprilTag Align & Approach
-        currentStep = "Limelight AprilTag Align & Approach"
-        val tagDetected = approachAprilTagIfDetected(targetDistanceInches = DESIRED_TAG_DISTANCE_INCHES, timeoutSec = 3.0)
-        sleep(200)
-
-        // Step 1c: Execute Launcher Function ONLY IF AprilTag is detected
-        if (tagDetected) {
-            currentStep = "Launching game elements at Shooting Position (AprilTag Confirmed)"
+        while (opModeIsActive() && (System.currentTimeMillis() - tagWaitStart) < 5000) {
             updatePoseAndTelemetry()
-            executeLaunchSequence(launchDurationMs = 2500, requireAprilTag = true)
-            sleep(200)
-        } else {
-            currentStep = "Skipping Shooting: No AprilTag Detected in Field View"
-            updatePoseAndTelemetry()
-            sleep(1000)
+            val tag = getAprilTagTarget()
+            if (tag != null && tag.isValid) {
+                tagFound = true
+                break
+            }
+            sleep(20)
         }
 
-        // Step 2: Follow Path to Reloading Start (34.80, 10.97, 180°)
-        currentStep = "2: Following Path -> Reloading Start (34.80, 10.97)"
+        // If seen, immediately spin launcher for 5 seconds (5000ms)
+        if (tagFound) {
+            currentStep = "AprilTag Detected! Launching for 5 seconds"
+            updatePoseAndTelemetry()
+            executeLaunchSequence(launchDurationMs = 5000L, requireAprilTag = false)
+        } else {
+            currentStep = "No AprilTag detected within 5s - Proceeding to paths"
+            updatePoseAndTelemetry()
+            sleep(200)
+        }
+
+        // Step 1: Follow Path to Shooting Position (56.0, 36.0) maintaining 90° heading
+        currentStep = "1: Following Path -> Shooting Position (56.0, 36.0, 90°)"
+        followPedroPath(paths.startPath())
+        sleep(250)
+
+        // Step 2: Follow Path to Reloading Start (34.80, 10.97) maintaining 90° heading
+        currentStep = "2: Following Path -> Reloading Start (34.80, 10.97, 90°)"
         followPedroPath(paths.reloadingStartPath())
         sleep(250)
 
-        // Step 3: Follow Path to Load Garden (0.83, 14.19, -5.42°)
-        currentStep = "3: Following Path -> Load Garden (0.83, 14.19)"
+        // Step 3: Follow Path to Load Garden (0.83, 14.19) maintaining 90° heading
+        currentStep = "3: Following Path -> Load Garden (0.83, 14.19, 90°)"
         followPedroPath(paths.loadGardenPath())
         sleep(250)
 
-        // Step 4: Follow Path to Opposite Shooting Position (52.82, 126.89, 270°)
-        currentStep = "4: Following Path -> Opposite Shooting (52.82, 126.89)"
+        // Step 4: Follow Path to Opposite Shooting Position (52.82, 126.89, rotating 90° -> 270°)
+        currentStep = "4: Following Path -> Opposite Shooting (52.82, 126.89, 270°)"
         followPedroPath(paths.oppositeShootingPositionPath())
         sleep(250)
 
@@ -140,10 +154,14 @@ class PedroAutoOpMode : LinearOpMode() {
 
     /**
      * Follows a Pedro Path smoothly using Pedro DrivePowers kinematics and odometry feedback.
+     * Uses look-ahead along the actual path curve so curved trajectories are tracked precisely
+     * instead of driving straight into obstacles.
      */
-    private fun followPedroPath(path: Path, timeoutSec: Double = 6.0) {
-        val targetPose = path.endPose()
+    private fun followPedroPath(path: Path, timeoutSec: Double = 8.0) {
+        val curve = path.curve
+        val finalTargetPose = path.endPose()
         val startTime = System.currentTimeMillis()
+        var currentT = 0.0
 
         while (opModeIsActive() && (System.currentTimeMillis() - startTime) < (timeoutSec * 1000)) {
             odometry.update(null)
@@ -151,24 +169,40 @@ class PedroAutoOpMode : LinearOpMode() {
             val currentY = odometry.posY
             val currentHeadingRad = Math.toRadians(odometry.heading)
 
-            val dx = targetPose.x() - currentX
-            val dy = targetPose.y() - currentY
-            val distanceRemaining = hypot(dx, dy)
+            // Find closest t-parameter on curve for current robot position (advancing forward only)
+            val posVec = Vector2D.cartesian(currentX, currentY)
+            val measuredT = curve.closestParameter(posVec, currentT)
+            currentT = maxOf(currentT, measuredT.coerceIn(0.0, 1.0))
 
-            var headingError = targetPose.heading() - currentHeadingRad
-            while (headingError > Math.PI) headingError -= 2 * Math.PI
-            while (headingError < -Math.PI) headingError += 2 * Math.PI
+            // Look-ahead along curve (look-ahead distance ~12 inches)
+            val curveLength = maxOf(curve.length(), 0.01)
+            val lookAheadT = (currentT + (12.0 / curveLength)).coerceIn(0.0, 1.0)
+            val targetVec = curve.get(lookAheadT)
+            val targetHeading = path.heading(lookAheadT)
+
+            val dx = targetVec.x() - currentX
+            val dy = targetVec.y() - currentY
+
+            // Distance and heading error to final endpoint for completion check
+            val distToFinal = hypot(finalTargetPose.x() - currentX, finalTargetPose.y() - currentY)
+            var finalHeadingError = finalTargetPose.heading() - currentHeadingRad
+            while (finalHeadingError > Math.PI) finalHeadingError -= 2 * Math.PI
+            while (finalHeadingError < -Math.PI) finalHeadingError += 2 * Math.PI
+
+            var trackingHeadingError = targetHeading - currentHeadingRad
+            while (trackingHeadingError > Math.PI) trackingHeadingError -= 2 * Math.PI
+            while (trackingHeadingError < -Math.PI) trackingHeadingError += 2 * Math.PI
 
             updatePoseAndTelemetry()
 
-            if (distanceRemaining < 1.5 && abs(Math.toDegrees(headingError)) < 3.0) {
+            if (currentT >= 0.95 && distToFinal < 2.0 && abs(Math.toDegrees(finalHeadingError)) < 4.0) {
                 break
             }
 
-            // Proportional feedback in field frame (X and Y displacement)
-            val fieldXCmd = (dx * 0.06).coerceIn(-0.6, 0.6)
-            val fieldYCmd = (dy * 0.06).coerceIn(-0.6, 0.6)
-            val turnPower = (headingError * 0.7).coerceIn(-0.4, 0.4)
+            // Proportional feedback toward look-ahead target in field frame
+            val fieldXCmd = (dx * 0.065).coerceIn(-0.65, 0.65)
+            val fieldYCmd = (dy * 0.065).coerceIn(-0.65, 0.65)
+            val turnPower = (trackingHeadingError * 0.7).coerceIn(-0.4, 0.4)
 
             // Convert field-frame vector to robot-frame vector given current robot heading
             val cosH = cos(currentHeadingRad)
@@ -334,7 +368,8 @@ class PedroAutoOpMode : LinearOpMode() {
         pinpointOk: Boolean = robot.pinpoint != null,
         limelightOk: Boolean = (robot.limelight?.status?.fps ?: 0.0) > 0.0,
         motorsOk: Boolean = robot.frontLeftDrive != null && robot.frontRightDrive != null && robot.backLeftDrive != null && robot.backRightDrive != null,
-        launchersOk: Boolean = robot.launcher != null && robot.launcher2 != null
+        launchersOk: Boolean = robot.launcher != null && robot.launcher2 != null,
+        pinpointStatus: GoBildaPinpointDriver.DeviceStatus? = robot.pinpoint?.deviceStatus
     ) {
         val launcherVel = robot.launcher?.velocity ?: 0.0
         val launcher2Vel = robot.launcher2?.velocity ?: 0.0
@@ -358,7 +393,7 @@ class PedroAutoOpMode : LinearOpMode() {
         packet.put("Launcher 1 Vel", launcherVel)
         packet.put("Launcher 2 Vel", launcher2Vel)
 
-        packet.put("HW: Pinpoint Odometry", if (pinpointOk) "OK" else "FAILED")
+        packet.put("HW: Pinpoint Odometry", if (pinpointOk) "OK (${pinpointStatus?.name ?: "READY"})" else "FAILED (${pinpointStatus?.name ?: "OFFLINE"})")
         packet.put("HW: Limelight Camera", if (limelightOk) "OK" else "OFFLINE")
         packet.put("HW: Drivetrain Motors", if (motorsOk) "OK" else "INCOMPLETE")
         packet.put("HW: Launcher Flywheels", if (launchersOk) "OK" else "INCOMPLETE")
@@ -385,7 +420,8 @@ class PedroAutoOpMode : LinearOpMode() {
         telemetry.addData("Pose (Live Inspection)", "X: %.2f in, Y: %.2f in, Heading: %.1f°", x, y, headingDeg)
 
         telemetry.addData("--- Hardware Inspection ---", "")
-        telemetry.addData("Pinpoint Odometry", if (pinpointOk) "OPERATIONAL" else "NOT CONNECTED")
+        val pinpointStatusStr = pinpointStatus?.name ?: if (pinpointOk) "READY" else "NOT CONNECTED"
+        telemetry.addData("Pinpoint Odometry", "%s (%s)", if (pinpointOk) "OPERATIONAL" else "FAULT/OFFLINE", pinpointStatusStr)
         telemetry.addData("Limelight Camera", if (limelightOk) "ONLINE (%.0f FPS)" else "OFFLINE", limelightStatus?.fps ?: 0.0)
         telemetry.addData("Mecanum Drivetrain", if (motorsOk) "OPERATIONAL (4 Motors)" else "MOTOR MISSING")
         telemetry.addData("Launcher Flywheels", if (launchersOk) "OPERATIONAL (Dual Motors)" else "MOTOR MISSING")

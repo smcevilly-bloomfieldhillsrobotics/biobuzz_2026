@@ -24,6 +24,7 @@ package org.firstinspires.ftc.teamcode
 
 import com.acmerobotics.dashboard.config.Config
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D
@@ -96,8 +97,23 @@ class OdometrySubsystem(private val robot: RobotHardware) {
     }
 
     fun resetPosition(x: Double = 0.0, y: Double = 0.0, headingDeg: Double = 0.0) {
-        robot.pinpoint?.setPosition(Pose2D(DistanceUnit.INCH, x, y, AngleUnit.DEGREES, headingDeg))
-        robot.pinpoint?.update()
+        val pinpoint = robot.pinpoint ?: return
+
+        // Wait up to 1 second for Pinpoint IMU calibration/reset to finish before setting pose
+        val startWait = System.currentTimeMillis()
+        while (pinpoint.deviceStatus == GoBildaPinpointDriver.DeviceStatus.CALIBRATING ||
+               pinpoint.deviceStatus == GoBildaPinpointDriver.DeviceStatus.NOT_READY) {
+            if (System.currentTimeMillis() - startWait > 1000) break
+            try {
+                Thread.sleep(20)
+            } catch (_: InterruptedException) {
+                break
+            }
+            pinpoint.update()
+        }
+
+        pinpoint.setPosition(Pose2D(DistanceUnit.INCH, x, y, AngleUnit.DEGREES, headingDeg))
+        pinpoint.update()
         refreshOnce()
     }
 }

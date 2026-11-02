@@ -9,6 +9,8 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 import kotlin.math.abs
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled
+
 /**
  * Diagnostic & Calibration TeleOp powered directly by Pedro Pathing's Mecanum Drivetrain & DrivePowers.
  *
@@ -33,6 +35,7 @@ import kotlin.math.abs
  *    - Left Stick: Translation (Y = forward/back, X = strafe)
  *    - Right Stick X: Rotation
  */
+@Disabled
 @TeleOp(name = "Mecanum Wheel Diagnostics & Setup", group = "Diagnostics")
 class MecanumWheelTestTeleop : LinearOpMode() {
 

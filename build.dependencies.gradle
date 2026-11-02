@@ -3,6 +3,7 @@ repositories {
     google() // Needed for androidx
     maven { url = 'https://maven.brott.dev/' } // Needed for FTC Dashboard & Road Runner
     maven { url = 'https://repo.dairy.foundation/releases/' } // Needed for Pedro Pathing
+    maven { url = 'https://mymaven.bylazar.com/releases' } // Needed for Panels
     maven { url = 'https://jitpack.io' } // JitPack for FTC libraries
 }
 

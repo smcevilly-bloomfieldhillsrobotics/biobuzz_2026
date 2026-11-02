@@ -6,11 +6,14 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled
+
 /**
  * A dedicated TeleOp mode focused exclusively on the Intake and Launcher subsystem.
  * This can be useful for tuning launcher velocity or diagnosing intake jams without 
  * engaging the drivetrain or odometry systems.
  */
+@Disabled
 @TeleOp(name = "BioBuzz Launcher Tuning", group = "Test")
 class BioBuzzLauncherTeleop : OpMode() {
 
