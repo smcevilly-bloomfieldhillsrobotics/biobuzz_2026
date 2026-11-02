@@ -220,7 +220,7 @@ class RobotHardware {
                         GoBildaPinpointDriver.EncoderDirection.REVERSED,
                         GoBildaPinpointDriver.EncoderDirection.FORWARD,
                     )
-                    resetPosAndIMU()
+                    recalibrateIMU()
                 }
                 if (pinpoint != null) break
             } catch (_: Exception) {

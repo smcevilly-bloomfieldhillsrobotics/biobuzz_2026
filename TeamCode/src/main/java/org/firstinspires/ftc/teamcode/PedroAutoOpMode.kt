@@ -55,21 +55,28 @@ class PedroAutoOpMode : LinearOpMode() {
         odometry = OdometrySubsystem(robot)
 
         // Initialize odometry to default startPose (56.0, 8.0, 90°)
-        // Note: paths.startPose.heading() is already in radians in Pedro Pathing (PoseFactory.degrees converts to radians internally)
-        odometry.resetPosition(
-            paths.startPose.x(),
-            paths.startPose.y(),
-            Math.toDegrees(paths.startPose.heading())
-        )
+        val startX = paths.startPose.x()
+        val startY = paths.startPose.y()
+        val startHeadingDeg = Math.toDegrees(paths.startPose.heading())
+
+        odometry.resetPosition(startX, startY, startHeadingDeg)
 
         // Continuous init inspection loop until START button is pressed
         currentStep = "Init - Hardware Verification & Pose Inspection"
+        var poseInitializedOnReady = false
 
         while (!isStarted && !isStopRequested) {
-            odometry.update(null)
-
             val pinpointStatus = robot.pinpoint?.deviceStatus
             val pinpointOk = robot.pinpoint != null && pinpointStatus == GoBildaPinpointDriver.DeviceStatus.READY
+
+            // Re-apply starting pose as soon as Pinpoint finishes IMU calibration during init
+            if (pinpointOk && !poseInitializedOnReady) {
+                odometry.resetPosition(startX, startY, startHeadingDeg)
+                poseInitializedOnReady = true
+            }
+
+            odometry.update(null)
+
             val limelightStatus = robot.limelight?.status
             val limelightOk = (limelightStatus?.fps ?: 0.0) > 0.0
             val motorsOk = robot.frontLeftDrive != null && robot.frontRightDrive != null &&
@@ -94,6 +101,9 @@ class PedroAutoOpMode : LinearOpMode() {
         }
 
         if (!opModeIsActive()) return
+
+        // Confirm start position at the moment START button is pressed
+        odometry.resetPosition(startX, startY, startHeadingDeg)
 
         // Wait up to 5 seconds to detect an AprilTag
         currentStep = "Waiting for AprilTag (up to 5s)"
