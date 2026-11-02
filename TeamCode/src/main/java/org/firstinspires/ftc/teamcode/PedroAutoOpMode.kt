@@ -253,13 +253,12 @@ class PedroAutoOpMode : LinearOpMode() {
             }
 
             if (flywheelsReady) {
-                robot.leftServo?.power = 1.0
-                robot.leftIntakeServo?.power = 0.8
-                robot.windmillServo?.power = 1.0
+                robot.leftLauncherServo?.power = 1.0
+                robot.rightLauncherServo?.power = 1.0
                 robot.intake?.power = 0.8
             } else {
-                robot.leftServo?.power = 0.0
-                robot.leftIntakeServo?.power = 0.0
+                robot.leftLauncherServo?.power = 0.0
+                robot.rightLauncherServo?.power = 0.0
             }
 
             updatePoseAndTelemetry()
@@ -268,10 +267,9 @@ class PedroAutoOpMode : LinearOpMode() {
 
         robot.launcher?.velocity = 0.0
         robot.launcher2?.velocity = 0.0
-        robot.windmillServo?.power = 0.0
         robot.intake?.power = 0.0
-        robot.leftIntakeServo?.power = 0.0
-        robot.leftServo?.power = 0.0
+        robot.leftLauncherServo?.power = 0.0
+        robot.rightLauncherServo?.power = 0.0
     }
 
     data class AprilTagTarget(

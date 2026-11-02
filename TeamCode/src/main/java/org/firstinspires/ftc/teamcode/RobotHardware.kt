@@ -51,11 +51,8 @@ class RobotHardware {
         val LAUNCHER_NAMES = arrayOf("launcher", "launcher_motor", "motor3", "motor_3", "right_launcher", "rightLauncher")
         val LAUNCHER_2_NAMES = arrayOf("launcher2", "launcher_motor_2", "motor4", "launcher_2", "left_launcher", "leftLauncher")
         val CAMERA_MOTOR_NAMES = arrayOf("camera_motor", "motor3", "motor_3", "cameraMotor", "pan_motor")
-        val WINDMILL_SERVO_NAMES = arrayOf("windmill", "windmillServo", "servo0")
-        val LEFT_INTAKE_SERVO_NAMES = arrayOf("left_intake_servo", "leftIntakeServo", "servo1", "left_servo", "leftServo")
-        val RIGHT_INTAKE_SERVO_NAMES = arrayOf("right_intake_servo", "rightIntakeServo", "servo2", "right_servo", "rightServo")
-        val LEFT_SERVO_NAMES = arrayOf("left_servo", "leftServo", "servo3", "left_launcher_servo", "leftLauncherServo")
-        val RIGHT_SERVO_NAMES = arrayOf("right_servo", "rightServo", "servo4", "right_launcher_servo", "rightLauncherServo")
+        val LEFT_LAUNCHER_SERVO_NAMES = arrayOf("left_launcher_servo", "leftLauncherServo", "left_intake_servo", "leftIntakeServo", "left_servo", "leftServo", "servo1", "servo3")
+        val RIGHT_LAUNCHER_SERVO_NAMES = arrayOf("right_launcher_servo", "rightLauncherServo", "right_intake_servo", "rightIntakeServo", "right_servo", "rightServo", "servo2", "servo4")
         val LIMELIGHT_NAMES = arrayOf("limelight", "limelight3a", "camera")
         val PINPOINT_NAMES = arrayOf("pinpoint", "odometry", "pinpoint_odom")
     }
@@ -70,11 +67,11 @@ class RobotHardware {
     var launcher: DcMotorEx? = null
     var launcher2: DcMotorEx? = null
     var cameraMotor: DcMotor? = null
-    var windmillServo: CRServo? = null
-    var leftIntakeServo: CRServo? = null
-    var rightIntakeServo: CRServo? = null
-    var leftServo: CRServo? = null
-    var rightServo: CRServo? = null
+    var leftLauncherServo: CRServo? = null
+    var rightLauncherServo: CRServo? = null
+
+    val leftServo: CRServo? get() = leftLauncherServo
+    val rightServo: CRServo? get() = rightLauncherServo
     var limelight: Limelight3A? = null
     var pinpoint: GoBildaPinpointDriver? = null
 
@@ -175,27 +172,12 @@ class RobotHardware {
             mode = DcMotor.RunMode.RUN_USING_ENCODER
         }
 
-        windmillServo = tryGetCRServo(hardwareMap, *WINDMILL_SERVO_NAMES)?.apply {
+        leftLauncherServo = tryGetCRServo(hardwareMap, *LEFT_LAUNCHER_SERVO_NAMES)?.apply {
             direction = DcMotorSimple.Direction.FORWARD
             power = 0.0
         }
 
-        leftIntakeServo = tryGetCRServo(hardwareMap, *LEFT_INTAKE_SERVO_NAMES)?.apply {
-            direction = DcMotorSimple.Direction.FORWARD
-            power = 0.0
-        }
-
-        rightIntakeServo = tryGetCRServo(hardwareMap, *RIGHT_INTAKE_SERVO_NAMES)?.apply {
-            direction = DcMotorSimple.Direction.REVERSE
-            power = 0.0
-        }
-
-        leftServo = (tryGetCRServo(hardwareMap, *LEFT_SERVO_NAMES) ?: leftIntakeServo)?.apply {
-            direction = DcMotorSimple.Direction.FORWARD
-            power = 0.0
-        }
-
-        rightServo = (tryGetCRServo(hardwareMap, *RIGHT_SERVO_NAMES) ?: rightIntakeServo)?.apply {
+        rightLauncherServo = tryGetCRServo(hardwareMap, *RIGHT_LAUNCHER_SERVO_NAMES)?.apply {
             direction = DcMotorSimple.Direction.REVERSE
             power = 0.0
         }

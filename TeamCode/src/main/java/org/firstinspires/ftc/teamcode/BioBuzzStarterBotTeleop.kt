@@ -68,8 +68,9 @@ class BioBuzzStarterBotTeleop : OpMode() {
             odometry.resetPosition(0.0, 0.0, 0.0)
         }
 
-        // Driver 2: Intake & Single Launcher
+        // Driver 2: Intake & Dual Launcher
         intakeLauncher.update(
+            gamepad2.a,
             gamepad2.right_trigger,
             gamepad2.left_trigger,
             gamepad2.right_bumper,

@@ -211,28 +211,24 @@ class RoadRunnerAutoOpMode : LinearOpMode() {
             }
 
             if (flywheelsReady) {
-                robot.leftServo?.power = 1.0
-                robot.leftIntakeServo?.power = 0.8
-                robot.windmillServo?.power = 1.0
+                robot.leftLauncherServo?.power = 1.0
+                robot.rightLauncherServo?.power = 1.0
                 robot.intake?.power = 0.8
             } else {
-                robot.leftServo?.power = 0.0
-                robot.leftIntakeServo?.power = 0.0
+                robot.leftLauncherServo?.power = 0.0
+                robot.rightLauncherServo?.power = 0.0
             }
 
             updatePoseAndTelemetry()
             sleep(20)
         }
 
-        // 2. Stop launcher, windmill, intake, and servos
+        // 2. Stop launcher, intake, and launcher servos
         robot.launcher?.velocity = 0.0
         robot.launcher2?.velocity = 0.0
-        robot.windmillServo?.power = 0.0
         robot.intake?.power = 0.0
-        robot.leftIntakeServo?.power = 0.0
-        robot.rightIntakeServo?.power = 0.0
-        robot.leftServo?.power = 0.0
-        robot.rightServo?.power = 0.0
+        robot.leftLauncherServo?.power = 0.0
+        robot.rightLauncherServo?.power = 0.0
     }
 
     private fun runBlockingAction(action: Action) {

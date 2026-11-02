@@ -44,6 +44,7 @@ class BioBuzzLauncherTeleop : OpMode() {
         // Right Bumper: Run intake forwards
         // Left Bumper: Reverse intake & servos (unjam)
         intakeLauncher.update(
+            gamepad1.a,
             gamepad1.right_trigger,
             gamepad1.left_trigger,
             gamepad1.right_bumper,

@@ -74,7 +74,13 @@ class BioBuzzMecanumTeleop : OpMode() {
         }
 
         // Driver 2: Dual Launcher & Intake controls
+        // Button A: Spin up launchers to target velocity
+        // RT: Feed Right Launcher servo (only when right launcher is at target speed)
+        // LT: Feed Left Launcher servo (only when left launcher is at target speed)
+        // RB: Intake Forward
+        // LB: Reverse Intake & Servos (unjam)
         intakeLauncher.update(
+            controls.spinUpLaunchers,
             controls.rightLauncherTrigger,
             controls.leftLauncherTrigger,
             controls.intakeForward,

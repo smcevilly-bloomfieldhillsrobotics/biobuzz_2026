@@ -37,10 +37,13 @@ class DriverControls(val driver1: GamepadEx, val driver2: GamepadEx) {
 
     // --- Driver 2 Controls (Intake & Dual Launchers) ---
 
-    /** Driver 2 Right Trigger for Right Launcher spin-up */
+    /** Driver 2 Button A to spin up launchers to target velocity */
+    val spinUpLaunchers: Boolean get() = driver2.gamepad.a
+
+    /** Driver 2 Right Trigger for Right Launcher servo feed (if right launcher at speed) */
     val rightLauncherTrigger: Float get() = driver2.gamepad.right_trigger
 
-    /** Driver 2 Left Trigger for Left Launcher spin-up */
+    /** Driver 2 Left Trigger for Left Launcher servo feed (if left launcher at speed) */
     val leftLauncherTrigger: Float get() = driver2.gamepad.left_trigger
 
     /** Driver 2 Right Bumper for intake forward */
