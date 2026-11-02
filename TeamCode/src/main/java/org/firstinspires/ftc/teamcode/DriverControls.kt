@@ -35,16 +35,18 @@ class DriverControls(val driver1: GamepadEx, val driver2: GamepadEx) {
     /** Zero field heading and odometry position (Rising edge on Driver 1 'BACK') */
     val resetOdometry: Boolean get() = driver1.backJustPressed
 
-    // --- Driver 2 Controls (Intake & Dual Launchers) ---
+    // --- Driver 2 Controls (Intake, Nectar & Pollen Launchers) ---
 
-    /** Driver 2 Button A to spin up launchers to target velocity */
+    /** Driver 2 Button A to spin up Nectar & Pollen launchers to target velocity */
     val spinUpLaunchers: Boolean get() = driver2.gamepad.a
 
-    /** Driver 2 Right Trigger for Right Launcher servo feed (if right launcher at speed) */
-    val rightLauncherTrigger: Float get() = driver2.gamepad.right_trigger
+    /** Driver 2 Right Trigger for Nectar Launcher (Right Launcher) servo feed */
+    val nectarLauncherTrigger: Float get() = driver2.gamepad.right_trigger
+    val rightLauncherTrigger: Float get() = nectarLauncherTrigger
 
-    /** Driver 2 Left Trigger for Left Launcher servo feed (if left launcher at speed) */
-    val leftLauncherTrigger: Float get() = driver2.gamepad.left_trigger
+    /** Driver 2 Left Trigger for Pollen Launcher (Left Launcher) servo feed */
+    val pollenLauncherTrigger: Float get() = driver2.gamepad.left_trigger
+    val leftLauncherTrigger: Float get() = pollenLauncherTrigger
 
     /** Driver 2 Right Bumper for intake forward */
     val intakeForward: Boolean get() = driver2.gamepad.right_bumper
@@ -52,15 +54,19 @@ class DriverControls(val driver1: GamepadEx, val driver2: GamepadEx) {
     /** Driver 2 Left Bumper for intake reverse */
     val intakeReverse: Boolean get() = driver2.gamepad.left_bumper
 
-    /** Adjust Right Launcher velocity up (Rising edge on D-Pad Up) */
-    val launcher1VelocityUp: Boolean get() = driver2.dpadUpJustPressed
+    /** Adjust Nectar Launcher velocity up (Rising edge on D-Pad Up) */
+    val nectarVelocityUp: Boolean get() = driver2.dpadUpJustPressed
+    val launcher1VelocityUp: Boolean get() = nectarVelocityUp
 
-    /** Adjust Right Launcher velocity down (Rising edge on D-Pad Down) */
-    val launcher1VelocityDown: Boolean get() = driver2.dpadDownJustPressed
+    /** Adjust Nectar Launcher velocity down (Rising edge on D-Pad Down) */
+    val nectarVelocityDown: Boolean get() = driver2.dpadDownJustPressed
+    val launcher1VelocityDown: Boolean get() = nectarVelocityDown
 
-    /** Adjust Left Launcher velocity up (Rising edge on D-Pad Right) */
-    val launcher2VelocityUp: Boolean get() = driver2.dpadRightJustPressed
+    /** Adjust Pollen Launcher velocity up (Rising edge on D-Pad Right) */
+    val pollenVelocityUp: Boolean get() = driver2.dpadRightJustPressed
+    val launcher2VelocityUp: Boolean get() = pollenVelocityUp
 
-    /** Adjust Left Launcher velocity down (Rising edge on D-Pad Left) */
-    val launcher2VelocityDown: Boolean get() = driver2.dpadLeftJustPressed
+    /** Adjust Pollen Launcher velocity down (Rising edge on D-Pad Left) */
+    val pollenVelocityDown: Boolean get() = driver2.dpadLeftJustPressed
+    val launcher2VelocityDown: Boolean get() = pollenVelocityDown
 }

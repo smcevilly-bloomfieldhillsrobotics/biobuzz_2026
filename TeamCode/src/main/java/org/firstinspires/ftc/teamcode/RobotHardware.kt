@@ -48,11 +48,13 @@ class RobotHardware {
         val BACK_LEFT_DRIVE_NAMES = arrayOf("back_left_drive", "leftRear", "backLeft", "motor2")
         val BACK_RIGHT_DRIVE_NAMES = arrayOf("back_right_drive", "rightRear", "backRight", "motor3")
         val INTAKE_NAMES = arrayOf("intake", "intake_motor", "motor2")
-        val LAUNCHER_NAMES = arrayOf("launcher", "launcher_motor", "motor3", "motor_3", "right_launcher", "rightLauncher")
-        val LAUNCHER_2_NAMES = arrayOf("launcher2", "launcher_motor_2", "motor4", "launcher_2", "left_launcher", "leftLauncher")
+        // Nectar Launcher = Right Launcher (Motor 3 / Right)
+        val NECTAR_LAUNCHER_NAMES = arrayOf("nectar_launcher", "nectarLauncher", "launcher", "launcher_motor", "motor3", "motor_3", "right_launcher", "rightLauncher")
+        // Pollen Launcher = Left Launcher (Motor 4 / Left)
+        val POLLEN_LAUNCHER_NAMES = arrayOf("pollen_launcher", "pollenLauncher", "launcher2", "launcher_motor_2", "motor4", "launcher_2", "left_launcher", "leftLauncher")
         val CAMERA_MOTOR_NAMES = arrayOf("camera_motor", "motor3", "motor_3", "cameraMotor", "pan_motor")
-        val LEFT_LAUNCHER_SERVO_NAMES = arrayOf("left_launcher_servo", "leftLauncherServo", "left_intake_servo", "leftIntakeServo", "left_servo", "leftServo", "servo1", "servo3")
-        val RIGHT_LAUNCHER_SERVO_NAMES = arrayOf("right_launcher_servo", "rightLauncherServo", "right_intake_servo", "rightIntakeServo", "right_servo", "rightServo", "servo2", "servo4")
+        val POLLEN_LAUNCHER_SERVO_NAMES = arrayOf("pollen_launcher_servo", "pollenLauncherServo", "left_launcher_servo", "leftLauncherServo", "left_intake_servo", "leftIntakeServo", "left_servo", "leftServo", "servo1", "servo3")
+        val NECTAR_LAUNCHER_SERVO_NAMES = arrayOf("nectar_launcher_servo", "nectarLauncherServo", "right_launcher_servo", "rightLauncherServo", "right_intake_servo", "rightIntakeServo", "right_servo", "rightServo", "servo2", "servo4")
         val LIMELIGHT_NAMES = arrayOf("limelight", "limelight3a", "camera")
         val PINPOINT_NAMES = arrayOf("pinpoint", "odometry", "pinpoint_odom")
     }
@@ -64,14 +66,19 @@ class RobotHardware {
     var backLeftDrive: DcMotor? = null
     var backRightDrive: DcMotor? = null
     var intake: DcMotor? = null
-    var launcher: DcMotorEx? = null
-    var launcher2: DcMotorEx? = null
+    var nectarLauncher: DcMotorEx? = null
+    var pollenLauncher: DcMotorEx? = null
     var cameraMotor: DcMotor? = null
-    var leftLauncherServo: CRServo? = null
-    var rightLauncherServo: CRServo? = null
+    var nectarLauncherServo: CRServo? = null
+    var pollenLauncherServo: CRServo? = null
 
-    val leftServo: CRServo? get() = leftLauncherServo
-    val rightServo: CRServo? get() = rightLauncherServo
+    // Backward-compatible aliases
+    val launcher: DcMotorEx? get() = nectarLauncher
+    val launcher2: DcMotorEx? get() = pollenLauncher
+    val rightLauncherServo: CRServo? get() = nectarLauncherServo
+    val leftLauncherServo: CRServo? get() = pollenLauncherServo
+    val rightServo: CRServo? get() = nectarLauncherServo
+    val leftServo: CRServo? get() = pollenLauncherServo
     var limelight: Limelight3A? = null
     var pinpoint: GoBildaPinpointDriver? = null
 
@@ -161,24 +168,24 @@ class RobotHardware {
             mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         }
 
-        launcher = tryGetMotorEx(hardwareMap, *LAUNCHER_NAMES)?.apply {
+        nectarLauncher = tryGetMotorEx(hardwareMap, *NECTAR_LAUNCHER_NAMES)?.apply {
             zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
             mode = DcMotor.RunMode.RUN_USING_ENCODER
         }
 
-        launcher2 = tryGetMotorEx(hardwareMap, *LAUNCHER_2_NAMES)?.apply {
+        pollenLauncher = tryGetMotorEx(hardwareMap, *POLLEN_LAUNCHER_NAMES)?.apply {
             direction = DcMotorSimple.Direction.REVERSE
             zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
             mode = DcMotor.RunMode.RUN_USING_ENCODER
         }
 
-        leftLauncherServo = tryGetCRServo(hardwareMap, *LEFT_LAUNCHER_SERVO_NAMES)?.apply {
-            direction = DcMotorSimple.Direction.FORWARD
+        nectarLauncherServo = tryGetCRServo(hardwareMap, *NECTAR_LAUNCHER_SERVO_NAMES)?.apply {
+            direction = DcMotorSimple.Direction.REVERSE
             power = 0.0
         }
 
-        rightLauncherServo = tryGetCRServo(hardwareMap, *RIGHT_LAUNCHER_SERVO_NAMES)?.apply {
-            direction = DcMotorSimple.Direction.REVERSE
+        pollenLauncherServo = tryGetCRServo(hardwareMap, *POLLEN_LAUNCHER_SERVO_NAMES)?.apply {
+            direction = DcMotorSimple.Direction.FORWARD
             power = 0.0
         }
     }

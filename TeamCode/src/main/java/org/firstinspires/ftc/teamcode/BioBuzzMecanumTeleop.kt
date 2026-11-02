@@ -74,37 +74,37 @@ class BioBuzzMecanumTeleop : OpMode() {
         }
 
         // Driver 2: Dual Launcher & Intake controls
-        // Button A: Spin up launchers to target velocity
-        // RT: Feed Right Launcher servo (only when right launcher is at target speed)
-        // LT: Feed Left Launcher servo (only when left launcher is at target speed)
+        // Button A: Spin up Nectar & Pollen launchers to target velocity
+        // RT: Feed Nectar Launcher (Right) servo (only when Nectar launcher is at target speed)
+        // LT: Feed Pollen Launcher (Left) servo (only when Pollen launcher is at target speed)
         // RB: Intake Forward
         // LB: Reverse Intake & Servos (unjam)
         intakeLauncher.update(
             controls.spinUpLaunchers,
-            controls.rightLauncherTrigger,
-            controls.leftLauncherTrigger,
+            controls.nectarLauncherTrigger,
+            controls.pollenLauncherTrigger,
             controls.intakeForward,
             controls.intakeReverse
         )
 
         // Driver 2: Tune Launcher Velocities with D-Pad
-        if (controls.launcher1VelocityUp) {
-            intakeLauncher.adjustLauncher1Velocity(50.0)
+        if (controls.nectarVelocityUp) {
+            intakeLauncher.adjustNectarLauncherVelocity(50.0)
         }
-        if (controls.launcher1VelocityDown) {
-            intakeLauncher.adjustLauncher1Velocity(-50.0)
+        if (controls.nectarVelocityDown) {
+            intakeLauncher.adjustNectarLauncherVelocity(-50.0)
         }
 
-        if (controls.launcher2VelocityUp) {
-            intakeLauncher.adjustLauncher2Velocity(50.0)
+        if (controls.pollenVelocityUp) {
+            intakeLauncher.adjustPollenLauncherVelocity(50.0)
         }
-        if (controls.launcher2VelocityDown) {
-            intakeLauncher.adjustLauncher2Velocity(-50.0)
+        if (controls.pollenVelocityDown) {
+            intakeLauncher.adjustPollenLauncherVelocity(-50.0)
         }
 
         // Update Odometry and stream telemetry to FTC Dashboard
-        val rightLauncherVel = robot.launcher?.velocity ?: 0.0
-        val leftLauncherVel = robot.launcher2?.velocity ?: 0.0
+        val nectarLauncherVel = robot.nectarLauncher?.velocity ?: 0.0
+        val pollenLauncherVel = robot.pollenLauncher?.velocity ?: 0.0
 
         val wheelPowers = pedroMecanum.wheelPowers
         val flPower = if (wheelPowers.isNotEmpty()) wheelPowers[0] else 0.0
@@ -114,10 +114,10 @@ class BioBuzzMecanumTeleop : OpMode() {
 
         val packet = TelemetryPacket()
         packet.put("Drive Mode", if (fieldCentric) "Field-Centric" else "Robot-Centric")
-        packet.put("Right Launcher Vel", rightLauncherVel)
-        packet.put("Right Launcher Target", IntakeLauncherSubsystem.TARGET_VELOCITY)
-        packet.put("Left Launcher Vel", leftLauncherVel)
-        packet.put("Left Launcher Target", IntakeLauncherSubsystem.LAUNCHER_2_TARGET_VELOCITY)
+        packet.put("Nectar Launcher Vel", nectarLauncherVel)
+        packet.put("Nectar Launcher Target", IntakeLauncherSubsystem.NECTAR_TARGET_VELOCITY)
+        packet.put("Pollen Launcher Vel", pollenLauncherVel)
+        packet.put("Pollen Launcher Target", IntakeLauncherSubsystem.POLLEN_TARGET_VELOCITY)
         packet.put("Intake Power", intakeLauncher.intakePower)
         packet.put("FL Power", flPower)
         packet.put("FR Power", frPower)
@@ -141,9 +141,9 @@ class BioBuzzMecanumTeleop : OpMode() {
         telemetry.addData("Motors (FL, FR, BL, BR)", "%.2f, %.2f, %.2f, %.2f",
             flPower, frPower, blPower, brPower
         )
-        telemetry.addData("Controls", "RT: Right Launcher, LT: Left Launcher, RB: Intake, LB: Reverse/Unjam")
-        telemetry.addData("Right Launcher Vel", "%.1f ticks/sec (Target: %.0f)", rightLauncherVel, IntakeLauncherSubsystem.TARGET_VELOCITY)
-        telemetry.addData("Left Launcher Vel", "%.1f ticks/sec (Target: %.0f)", leftLauncherVel, IntakeLauncherSubsystem.LAUNCHER_2_TARGET_VELOCITY)
+        telemetry.addData("Controls", "A: Spin Up, RT: Nectar Launcher, LT: Pollen Launcher, RB: Intake, LB: Reverse/Unjam")
+        telemetry.addData("Nectar Launcher Vel", "%.1f ticks/sec (Target: %.0f)", nectarLauncherVel, IntakeLauncherSubsystem.NECTAR_TARGET_VELOCITY)
+        telemetry.addData("Pollen Launcher Vel", "%.1f ticks/sec (Target: %.0f)", pollenLauncherVel, IntakeLauncherSubsystem.POLLEN_TARGET_VELOCITY)
         telemetry.addData("Intake Power", "%.2f", intakeLauncher.intakePower)
 
         // Limelight AprilTag Telemetry

@@ -29,70 +29,83 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
 
     @Config
     companion object {
+        // Pollen Launcher (Launcher 1) Target & Min Velocities
+        @JvmField var POLLEN_TARGET_VELOCITY = 1550.0
+        @JvmField var POLLEN_MIN_VELOCITY = 1500.0
+
+        // Nectar Launcher (Launcher 2) Target & Min Velocities
+        @JvmField var NECTAR_TARGET_VELOCITY = 1550.0
+        @JvmField var NECTAR_MIN_VELOCITY = 1500.0
+
+        @JvmField var SERVO_PULSE_DURATION_MS = 200L // 200 milliseconds (0.2s)
+
+        // Backward compatibility aliases
         @JvmField var TARGET_VELOCITY = 1550.0
         @JvmField var MIN_VELOCITY = 1500.0
         @JvmField var LAUNCHER_2_TARGET_VELOCITY = 1550.0
         @JvmField var LAUNCHER_2_MIN_VELOCITY = 1500.0
-        @JvmField var SERVO_PULSE_DURATION_MS = 200L // 200 milliseconds (0.2s)
     }
 
     var intakePower: Double = 0.0
         private set
 
     // Trigger state tracking: Triggers must return to <= 0.05f (reach 0) to re-arm for another press
-    private var rightTriggerReleased = true
-    private var leftTriggerReleased = true
+    private var nectarTriggerReleased = true
+    private var pollenTriggerReleased = true
 
     // Timestamps when 200ms servo pulse ends
-    private var rightServoEndTimeMs = 0L
-    private var leftServoEndTimeMs = 0L
+    private var nectarServoEndTimeMs = 0L
+    private var pollenServoEndTimeMs = 0L
 
     fun adjustVelocity(delta: Double) {
-        TARGET_VELOCITY += delta
-        MIN_VELOCITY += delta
-        LAUNCHER_2_TARGET_VELOCITY += delta
-        LAUNCHER_2_MIN_VELOCITY += delta
+        NECTAR_TARGET_VELOCITY += delta
+        NECTAR_MIN_VELOCITY += delta
+        POLLEN_TARGET_VELOCITY += delta
+        POLLEN_MIN_VELOCITY += delta
     }
 
-    fun adjustLauncher1Velocity(delta: Double) {
-        TARGET_VELOCITY += delta
-        MIN_VELOCITY += delta
+    fun adjustNectarLauncherVelocity(delta: Double) {
+        NECTAR_TARGET_VELOCITY += delta
+        NECTAR_MIN_VELOCITY += delta
     }
 
-    fun adjustLauncher2Velocity(delta: Double) {
-        LAUNCHER_2_TARGET_VELOCITY += delta
-        LAUNCHER_2_MIN_VELOCITY += delta
+    fun adjustPollenLauncherVelocity(delta: Double) {
+        POLLEN_TARGET_VELOCITY += delta
+        POLLEN_MIN_VELOCITY += delta
     }
+
+    fun adjustLauncher1Velocity(delta: Double) = adjustNectarLauncherVelocity(delta)
+    fun adjustLauncher2Velocity(delta: Double) = adjustPollenLauncherVelocity(delta)
 
     /**
      * Updates intake and launcher controls:
-     * - [spinUpLaunchers] (Button A): Spins launchers up to target velocity
-     * - [rightTrigger]: Fires right launcher servo for 10ms upon trigger press (if launcher at speed)
-     * - [leftTrigger]: Fires left launcher servo for 10ms upon trigger press (if launcher at speed)
+     * - [spinUpLaunchers] (Button A): Spins Nectar & Pollen launchers up to target velocity
+     * - [nectarTrigger] (Right Trigger): Fires Nectar launcher (Right Launcher) servo for 200ms upon trigger press
+     * - [pollenTrigger] (Left Trigger): Fires Pollen launcher (Left Launcher) servo for 200ms upon trigger press
      * - [rightBumper]: Intake forward
      * - [leftBumper]: Reverse intake and launcher feed servos (unjam)
      */
     fun update(
         spinUpLaunchers: Boolean,
-        rightTrigger: Float,
-        leftTrigger: Float,
+        nectarTrigger: Float,
+        pollenTrigger: Float,
         rightBumper: Boolean,
         leftBumper: Boolean
     ) {
         // 1. Launchers Spin Up via Button A
         if (spinUpLaunchers) {
-            robot.launcher?.velocity = TARGET_VELOCITY
-            robot.launcher2?.velocity = LAUNCHER_2_TARGET_VELOCITY
+            robot.nectarLauncher?.velocity = NECTAR_TARGET_VELOCITY
+            robot.pollenLauncher?.velocity = POLLEN_TARGET_VELOCITY
         } else {
-            robot.launcher?.velocity = 0.0
-            robot.launcher2?.velocity = 0.0
+            robot.nectarLauncher?.velocity = 0.0
+            robot.pollenLauncher?.velocity = 0.0
         }
 
-        val currentVel1 = robot.launcher?.velocity ?: 0.0
-        val currentVel2 = robot.launcher2?.velocity ?: 0.0
+        val currentNectarVel = robot.nectarLauncher?.velocity ?: 0.0
+        val currentPollenVel = robot.pollenLauncher?.velocity ?: 0.0
 
-        val rightAtSpeed = currentVel1 >= MIN_VELOCITY
-        val leftAtSpeed = currentVel2 >= LAUNCHER_2_MIN_VELOCITY
+        val nectarAtSpeed = currentNectarVel >= NECTAR_MIN_VELOCITY
+        val pollenAtSpeed = currentPollenVel >= POLLEN_MIN_VELOCITY
 
         // 2. Intake Motor Control (Right Bumper = Forward, Left Bumper = Reverse)
         intakePower = when {
@@ -104,57 +117,57 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
 
         val currentTimeMs = System.currentTimeMillis()
 
-        // 3. Right Trigger Edge Detection & 10ms Pulse Triggering
-        if (rightTrigger <= 0.05f) {
-            rightTriggerReleased = true
-        } else if (rightTrigger > 0.1f && rightTriggerReleased) {
-            rightTriggerReleased = false
-            if (rightAtSpeed) {
-                rightServoEndTimeMs = currentTimeMs + SERVO_PULSE_DURATION_MS
+        // 3. Nectar Launcher (Right) Trigger Edge Detection & 200ms Pulse
+        if (nectarTrigger <= 0.05f) {
+            nectarTriggerReleased = true
+        } else if (nectarTrigger > 0.1f && nectarTriggerReleased) {
+            nectarTriggerReleased = false
+            if (nectarAtSpeed) {
+                nectarServoEndTimeMs = currentTimeMs + SERVO_PULSE_DURATION_MS
             }
         }
 
-        // 4. Left Trigger Edge Detection & 10ms Pulse Triggering
-        if (leftTrigger <= 0.05f) {
-            leftTriggerReleased = true
-        } else if (leftTrigger > 0.1f && leftTriggerReleased) {
-            leftTriggerReleased = false
-            if (leftAtSpeed) {
-                leftServoEndTimeMs = currentTimeMs + SERVO_PULSE_DURATION_MS
+        // 4. Pollen Launcher (Left) Trigger Edge Detection & 200ms Pulse
+        if (pollenTrigger <= 0.05f) {
+            pollenTriggerReleased = true
+        } else if (pollenTrigger > 0.1f && pollenTriggerReleased) {
+            pollenTriggerReleased = false
+            if (pollenAtSpeed) {
+                pollenServoEndTimeMs = currentTimeMs + SERVO_PULSE_DURATION_MS
             }
         }
 
-        val rightPulsing = currentTimeMs < rightServoEndTimeMs
-        val leftPulsing = currentTimeMs < leftServoEndTimeMs
+        val nectarPulsing = currentTimeMs < nectarServoEndTimeMs
+        val pollenPulsing = currentTimeMs < pollenServoEndTimeMs
 
         // 5. Calculate Servo Powers
-        val rightServoPower = when {
-            rightPulsing -> 1.0
+        val nectarServoPower = when {
+            nectarPulsing -> 1.0
             leftBumper -> -1.0
             else -> 0.0
         }
 
-        val leftServoPower = when {
-            leftPulsing -> 1.0
+        val pollenServoPower = when {
+            pollenPulsing -> 1.0
             leftBumper -> -1.0
             else -> 0.0
         }
 
-        // Apply powers to left and right launcher feeder servos
-        robot.leftLauncherServo?.power = leftServoPower
-        robot.rightLauncherServo?.power = rightServoPower
+        // Apply powers to Nectar and Pollen launcher feeder servos
+        robot.nectarLauncherServo?.power = nectarServoPower
+        robot.pollenLauncherServo?.power = pollenServoPower
     }
 
     fun stop() {
         intakePower = 0.0
         robot.intake?.power = 0.0
-        robot.leftLauncherServo?.power = 0.0
-        robot.rightLauncherServo?.power = 0.0
-        robot.launcher?.velocity = 0.0
-        robot.launcher2?.velocity = 0.0
-        rightTriggerReleased = true
-        leftTriggerReleased = true
-        rightServoEndTimeMs = 0L
-        leftServoEndTimeMs = 0L
+        robot.nectarLauncherServo?.power = 0.0
+        robot.pollenLauncherServo?.power = 0.0
+        robot.nectarLauncher?.velocity = 0.0
+        robot.pollenLauncher?.velocity = 0.0
+        nectarTriggerReleased = true
+        pollenTriggerReleased = true
+        nectarServoEndTimeMs = 0L
+        pollenServoEndTimeMs = 0L
     }
 }
