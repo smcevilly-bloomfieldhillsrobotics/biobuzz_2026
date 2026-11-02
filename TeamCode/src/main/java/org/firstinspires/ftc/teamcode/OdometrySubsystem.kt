@@ -99,21 +99,18 @@ class OdometrySubsystem(private val robot: RobotHardware) {
     fun resetPosition(x: Double = 0.0, y: Double = 0.0, headingDeg: Double = 0.0) {
         val pinpoint = robot.pinpoint ?: return
 
-        // Wait up to 1 second for Pinpoint IMU calibration/reset to finish before setting pose
-        val startWait = System.currentTimeMillis()
-        while (pinpoint.deviceStatus == GoBildaPinpointDriver.DeviceStatus.CALIBRATING ||
-               pinpoint.deviceStatus == GoBildaPinpointDriver.DeviceStatus.NOT_READY) {
-            if (System.currentTimeMillis() - startWait > 1000) break
-            try {
-                Thread.sleep(20)
-            } catch (_: InterruptedException) {
-                break
+        try {
+            // Non-blocking quick update check for Pinpoint IMU calibration/reset
+            if (pinpoint.deviceStatus == GoBildaPinpointDriver.DeviceStatus.CALIBRATING ||
+                pinpoint.deviceStatus == GoBildaPinpointDriver.DeviceStatus.NOT_READY) {
+                pinpoint.update()
             }
-            pinpoint.update()
-        }
 
-        pinpoint.setPosition(Pose2D(DistanceUnit.INCH, x, y, AngleUnit.DEGREES, headingDeg))
-        pinpoint.update()
-        refreshOnce()
+            pinpoint.setPosition(Pose2D(DistanceUnit.INCH, x, y, AngleUnit.DEGREES, headingDeg))
+            pinpoint.update()
+            refreshOnce()
+        } catch (_: Exception) {
+            // Protect against I2C bus timeout/stall
+        }
     }
 }
