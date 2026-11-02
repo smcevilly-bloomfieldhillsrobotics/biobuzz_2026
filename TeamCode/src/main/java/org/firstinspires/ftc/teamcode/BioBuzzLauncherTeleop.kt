@@ -6,14 +6,11 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 
-import com.qualcomm.robotcore.eventloop.opmode.Disabled
-
 /**
- * A dedicated TeleOp mode focused exclusively on the Intake and Launcher subsystem.
+ * A dedicated TeleOp mode focused exclusively on the Intake, Nectar Launcher, and Pollen Launcher subsystems.
  * This can be useful for tuning launcher velocity or diagnosing intake jams without 
  * engaging the drivetrain or odometry systems.
  */
-@Disabled
 @TeleOp(name = "BioBuzz Launcher Tuning", group = "Test")
 class BioBuzzLauncherTeleop : OpMode() {
 
@@ -38,9 +35,10 @@ class BioBuzzLauncherTeleop : OpMode() {
     }
 
     override fun loop() {
-        // Driver 1: Controls Intake and Launcher (for standalone testing)
-        // Right Trigger: Spin Right Launcher (robot.launcher)
-        // Left Trigger: Spin Left Launcher (robot.launcher2)
+        // Driver 1: Controls Intake and Launchers (for standalone testing)
+        // Button A: Spin up Nectar & Pollen launchers to target velocity
+        // Right Trigger: Feed Nectar Launcher (Right)
+        // Left Trigger: Feed Pollen Launcher (Left)
         // Right Bumper: Run intake forwards
         // Left Bumper: Reverse intake & servos (unjam)
         intakeLauncher.update(
@@ -51,43 +49,43 @@ class BioBuzzLauncherTeleop : OpMode() {
             gamepad1.left_bumper
         )
 
-        // Adjust Launcher 1 Velocity (D-Pad Left/Right)
-        if (gamepad1.dpad_right && !lastDpadRight) {
-            intakeLauncher.adjustLauncher1Velocity(50.0)
-        }
-        if (gamepad1.dpad_left && !lastDpadLeft) {
-            intakeLauncher.adjustLauncher1Velocity(-50.0)
-        }
-        lastDpadRight = gamepad1.dpad_right
-        lastDpadLeft = gamepad1.dpad_left
-
-        // Adjust Launcher 2 Velocity (D-Pad Up/Down)
+        // Adjust Nectar Launcher Velocity (D-Pad Up/Down)
         if (gamepad1.dpad_up && !lastDpadUp) {
-            intakeLauncher.adjustLauncher2Velocity(50.0)
+            intakeLauncher.adjustNectarLauncherVelocity(50.0)
         }
         if (gamepad1.dpad_down && !lastDpadDown) {
-            intakeLauncher.adjustLauncher2Velocity(-50.0)
+            intakeLauncher.adjustNectarLauncherVelocity(-50.0)
         }
         lastDpadUp = gamepad1.dpad_up
         lastDpadDown = gamepad1.dpad_down
 
-        val launcherVel = robot.launcher?.velocity ?: 0.0
-        val launcher2Vel = robot.launcher2?.velocity ?: 0.0
+        // Adjust Pollen Launcher Velocity (D-Pad Left/Right)
+        if (gamepad1.dpad_right && !lastDpadRight) {
+            intakeLauncher.adjustPollenLauncherVelocity(50.0)
+        }
+        if (gamepad1.dpad_left && !lastDpadLeft) {
+            intakeLauncher.adjustPollenLauncherVelocity(-50.0)
+        }
+        lastDpadRight = gamepad1.dpad_right
+        lastDpadLeft = gamepad1.dpad_left
+
+        val nectarVel = robot.nectarLauncher?.velocity ?: 0.0
+        val pollenVel = robot.pollenLauncher?.velocity ?: 0.0
 
         val packet = TelemetryPacket()
-        packet.put("Launcher 1 Vel", launcherVel)
-        packet.put("Launcher 1 Target", IntakeLauncherSubsystem.TARGET_VELOCITY)
-        packet.put("Launcher 2 Vel", launcher2Vel)
-        packet.put("Launcher 2 Target", IntakeLauncherSubsystem.LAUNCHER_2_TARGET_VELOCITY)
+        packet.put("Nectar Launcher Vel", nectarVel)
+        packet.put("Nectar Launcher Target", IntakeLauncherSubsystem.NECTAR_TARGET_VELOCITY)
+        packet.put("Pollen Launcher Vel", pollenVel)
+        packet.put("Pollen Launcher Target", IntakeLauncherSubsystem.POLLEN_TARGET_VELOCITY)
         packet.put("Intake Power", intakeLauncher.intakePower)
         FtcDashboard.getInstance().sendTelemetryPacket(packet)
 
         // Telemetry
         telemetry.addData("--- BioBuzz Launcher Tuning ---", "")
-        telemetry.addData("Controls", "RT: Right Launcher, LT: Left Launcher, RB: Intake, LB: Reverse/Unjam")
-        telemetry.addData("Tuning", "D-Pad Left/Right: Right Launcher, D-Pad Up/Down: Left Launcher")
-        telemetry.addData("Right Launcher Vel", "%.1f ticks/sec (Target: %.0f)", launcherVel, IntakeLauncherSubsystem.TARGET_VELOCITY)
-        telemetry.addData("Left Launcher Vel", "%.1f ticks/sec (Target: %.0f)", launcher2Vel, IntakeLauncherSubsystem.LAUNCHER_2_TARGET_VELOCITY)
+        telemetry.addData("Controls", "A: Spin Up, RT: Nectar Launcher, LT: Pollen Launcher, RB: Intake, LB: Reverse/Unjam")
+        telemetry.addData("Tuning", "D-Pad Up/Down: Nectar Launcher, D-Pad Left/Right: Pollen Launcher")
+        telemetry.addData("Nectar Launcher Vel", "%.1f ticks/sec (Target: %.0f)", nectarVel, IntakeLauncherSubsystem.NECTAR_TARGET_VELOCITY)
+        telemetry.addData("Pollen Launcher Vel", "%.1f ticks/sec (Target: %.0f)", pollenVel, IntakeLauncherSubsystem.POLLEN_TARGET_VELOCITY)
         telemetry.addData("Intake Power", "%.2f", intakeLauncher.intakePower)
         
         telemetry.update()
