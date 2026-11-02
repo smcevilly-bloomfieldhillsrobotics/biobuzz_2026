@@ -57,7 +57,7 @@ class BioBuzzMecanumTeleop : OpMode() {
         // Driver 1: Holonomic Mecanum Drive (Pedro Pathing DrivePowers)
         val forward = -gamepad1.left_stick_y.toDouble()
         val strafe = -gamepad1.left_stick_x.toDouble() // Negated so gamepad right = right strafe in Pedro Pathing
-        val rotate = gamepad1.right_stick_x.toDouble()
+        val rotate = -gamepad1.right_stick_x.toDouble() // Negated so gamepad right = right rotation (CW) in Pedro Pathing
 
         // Toggle Field-Centric drive mode with Gamepad 1 A
         if (gamepad1.a && !lastAButton) {
