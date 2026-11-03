@@ -452,8 +452,12 @@ class PedroAutoOpMode : LinearOpMode() {
     }
 
     private fun drawBioBuzzFieldOverlay(fieldOverlay: Canvas, robotX: Double, robotY: Double, headingDeg: Double, activePath: Path? = null) {
+        // Draw Field Background Image (144" x 144") directly from /dash/field.png asset
+        fieldOverlay.drawImage("/dash/field.png", 0.0, 0.0, 144.0, 144.0)
+
         // Field Outer Perimeter (144" x 144")
         fieldOverlay.setStroke("#52525B")
+        fieldOverlay.setStrokeWidth(1)
         fieldOverlay.strokeRect(0.0, 0.0, 144.0, 144.0)
 
         // Draw Active Pedro Path Trajectory Line & Endpoint
@@ -467,15 +471,18 @@ class PedroAutoOpMode : LinearOpMode() {
                 py[i] = pt.y()
             }
             fieldOverlay.setStroke("#3B82F6") // Blue path curve
+            fieldOverlay.setStrokeWidth(2)
             fieldOverlay.strokePolyline(px, py)
 
             val end = path.endPose()
             fieldOverlay.setStroke("#F44336") // Red target point
+            fieldOverlay.setStrokeWidth(2)
             fieldOverlay.strokeCircle(end.x(), end.y(), 3.0)
         }
 
         // Robot Body (18" x 18" Circle & Heading Direction Line)
         fieldOverlay.setStroke("#22C55E")
+        fieldOverlay.setStrokeWidth(2)
         fieldOverlay.strokeCircle(robotX, robotY, 9.0)
 
         val headingRad = Math.toRadians(headingDeg)
