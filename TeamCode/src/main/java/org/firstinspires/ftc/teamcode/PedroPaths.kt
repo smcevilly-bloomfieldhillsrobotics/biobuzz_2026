@@ -30,23 +30,22 @@ class PedroPaths {
     val start: Pose = poseFactory.of(56.0, 8.0, 90.0)
     val startPose: Pose get() = start
 
-    val startPath: Pose = poseFactory.of(56.0, 36.0, 0.0)
+    val startPath: Pose = poseFactory.of(56.0, 36.0, 90.0)
     val shootingPosition: Pose get() = startPath
 
     val reloadingStartPathStart: Pose = poseFactory.of(56.0, 36.0, 90.0)
-    val reloadingStartPathControl1: Pose = poseFactory.of(56.0, 20.0, 0.0)
-    val reloadingStartPath: Pose = poseFactory.of(34.8008, 10.97, 180.0)
+    val reloadingStartPathControl1: Pose = poseFactory.of(56.0, 20.0, 90.0)
+    val reloadingStartPath: Pose = poseFactory.of(34.8, 11.0, 90.0)
     val reloadingStart: Pose get() = reloadingStartPath
 
-    val loadGardenPathStart: Pose = poseFactory.of(34.8008, 10.97, 180.0)
-    val loadGardenPathControl1: Pose = poseFactory.of(17.8, 12.58, 0.0)
-    val loadGardenPath: Pose = poseFactory.of(0.8333, 14.1918, -5.4183)
+    val loadGardenPathStart: Pose = poseFactory.of(34.8, 11.0, 90.0)
+    val loadGardenPathControl1: Pose = poseFactory.of(18.0, 12.6, 90.0)
+    val loadGardenPath: Pose = poseFactory.of(11.0, 14.2, 90.0) // X=11.0 for 2" clearance from X=0 wall
     val loadGarden: Pose get() = loadGardenPath
 
-    val oppositeShootingPositionPathStart: Pose = poseFactory.of(0.8333, 14.1918, -5.4183)
-    // Route safely along the left perimeter wall (X=10.0, well away from Red Hive at X=46.0) up to Y=85.0 before cutting in
-    val oppositeShootingPositionPathControl1: Pose = poseFactory.of(10.0, 85.0, 0.0)
-    val oppositeShootingPositionPath: Pose = poseFactory.of(52.8239, 126.8941, 270.0)
+    val oppositeShootingPositionPathStart: Pose = poseFactory.of(11.0, 14.2, 90.0)
+    val oppositeShootingPositionPathControl1: Pose = poseFactory.of(18.0, 85.0, 90.0) // X=18.0 for 9" safe wall clearance
+    val oppositeShootingPositionPath: Pose = poseFactory.of(52.8, 126.9, 270.0)
     val oppositeShootingPosition: Pose get() = oppositeShootingPositionPath
 
     // Trajectory functions configured for constant 90° heading throughout
