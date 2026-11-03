@@ -29,4 +29,7 @@ dependencies {
     implementation 'com.pedropathing:revhub:3.0.2'
     implementation 'com.pedropathing:tuning:1.0.2'
     implementation 'com.pedropathing:ivy:1.0.0'
+
+    // Panels Dashboard
+    implementation 'com.bylazar:panels:1.0.7'
 }
