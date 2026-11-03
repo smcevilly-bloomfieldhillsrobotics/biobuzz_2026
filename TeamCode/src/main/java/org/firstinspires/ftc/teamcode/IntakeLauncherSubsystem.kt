@@ -24,8 +24,10 @@ package org.firstinspires.ftc.teamcode
 
 import com.acmerobotics.dashboard.config.Config
 
+import org.firstinspires.ftc.teamcode.nextftc.NextSubsystem
+
 @Config
-class IntakeLauncherSubsystem(private val robot: RobotHardware) {
+class IntakeLauncherSubsystem(private val robot: RobotHardware) : NextSubsystem() {
 
     @Config
     companion object {
@@ -158,7 +160,7 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
         robot.pollenLauncherServo?.power = pollenServoPower
     }
 
-    fun stop() {
+    override fun stop() {
         intakePower = 0.0
         robot.intake?.power = 0.0
         robot.nectarLauncherServo?.power = 0.0

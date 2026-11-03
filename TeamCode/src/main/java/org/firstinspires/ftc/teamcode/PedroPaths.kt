@@ -26,48 +26,36 @@ class PedroPaths {
 
     private val poseFactory = PoseFactory.degrees()
 
-    // Poses defined with PoseFactory (X, Y, Heading in degrees)
-    val start: Pose = poseFactory.of(56.0, 8.0, 90.0)
-    val startPose: Pose get() = start
+    val startPose: Pose = poseFactory.of(56.0, 8.0, 90.0)
 
-    val startPath: Pose = poseFactory.of(56.0, 36.0, 90.0)
-    val shootingPosition: Pose get() = startPath
+    val shootingPositionPose: Pose = poseFactory.of(56.0, 36.0, 90.0)
 
     val reloadingStartPathStart: Pose = poseFactory.of(56.0, 36.0, 90.0)
     val reloadingStartPathControl1: Pose = poseFactory.of(56.0, 20.0, 90.0)
-    val reloadingStartPath: Pose = poseFactory.of(34.8, 11.0, 90.0)
-    val reloadingStart: Pose get() = reloadingStartPath
+    val reloadingStartPose: Pose = poseFactory.of(34.8, 11.0, 90.0)
 
     val loadGardenPathStart: Pose = poseFactory.of(34.8, 11.0, 90.0)
     val loadGardenPathControl1: Pose = poseFactory.of(18.0, 12.6, 90.0)
-    val loadGardenPath: Pose = poseFactory.of(11.0, 14.2, 90.0) // X=11.0 for 2" clearance from X=0 wall
-    val loadGarden: Pose get() = loadGardenPath
+    val loadGardenPose: Pose = poseFactory.of(11.0, 14.2, 90.0) // X=11.0 for 2" clearance from X=0 wall
 
     val oppositeShootingPositionPathStart: Pose = poseFactory.of(11.0, 14.2, 90.0)
     val oppositeShootingPositionPathControl1: Pose = poseFactory.of(18.0, 85.0, 90.0) // X=18.0 for 9" safe wall clearance
-    val oppositeShootingPositionPath: Pose = poseFactory.of(52.8, 126.9, 270.0)
-    val oppositeShootingPosition: Pose get() = oppositeShootingPositionPath
+    val oppositeShootingPositionPose: Pose = poseFactory.of(52.8, 126.9, 270.0)
 
     // Trajectory functions configured for constant 90° heading throughout
 
-    fun startPath(): Path =
-        Paths.line(start, startPath).constant(Math.toRadians(90.0))
+    val shootingPositionPath: Path get() = Paths.line(startPose, shootingPositionPose).constant(Math.toRadians(90.0))
 
-    fun shootingPositionPath(): Path = startPath()
+    val reloadingStartPath: Path get() = Paths.curve(reloadingStartPathStart, reloadingStartPathControl1, reloadingStartPose)
+        .constant(Math.toRadians(90.0))
 
-    fun reloadingStartPath(): Path =
-        Paths.curve(reloadingStartPathStart, reloadingStartPathControl1, reloadingStartPath)
-            .constant(Math.toRadians(90.0))
+    val loadGardenPath: Path get() = Paths.curve(loadGardenPathStart, loadGardenPathControl1, loadGardenPose)
+        .constant(Math.toRadians(90.0))
 
-    fun loadGardenPath(): Path =
-        Paths.curve(loadGardenPathStart, loadGardenPathControl1, loadGardenPath)
-            .constant(Math.toRadians(90.0))
-
-    fun oppositeShootingPositionPath(): Path =
-        Paths.curve(
-            oppositeShootingPositionPathStart,
-            oppositeShootingPositionPathControl1,
-            oppositeShootingPositionPath
-        ).linear(Math.toRadians(90.0), Math.toRadians(270.0))
+    val oppositeShootingPositionPath: Path get() = Paths.curve(
+        oppositeShootingPositionPathStart,
+        oppositeShootingPositionPathControl1,
+        oppositeShootingPositionPose
+    ).linear(Math.toRadians(90.0), Math.toRadians(270.0))
 }
 

@@ -31,12 +31,14 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose2D
 import kotlin.math.cos
 import kotlin.math.sin
 
+import org.firstinspires.ftc.teamcode.nextftc.NextSubsystem
+
 /**
  * OdometrySubsystem manages the goBILDA Pinpoint Odometry Computer for precise 
  * field position (X, Y) and heading tracking.
  */
 @Config
-class OdometrySubsystem(private val robot: RobotHardware) {
+class OdometrySubsystem(private val robot: RobotHardware) : NextSubsystem() {
 
     companion object {
         // Pod offsets for goBILDA Pinpoint Odometry Computer:

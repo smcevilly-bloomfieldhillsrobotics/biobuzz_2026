@@ -30,6 +30,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.util.ElapsedTime
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D
+import kotlin.math.hypot
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -280,6 +281,45 @@ class LimelightAimingSubsystem(hardwareMap: HardwareMap) {
             canvas.setFill("red")
             canvas.fillCircle(lastErrorTx, 0.0, 3.0)
         }
+    }
+
+    data class AprilTagTarget(
+        val id: Int,
+        val txDegrees: Double,
+        val distanceInches: Double,
+        val isValid: Boolean
+    )
+
+    fun getBestAprilTag(): AprilTagTarget? {
+        val result = limelight?.latestResult ?: return null
+        if (!result.isValid) return null
+
+        val fiducials = result.fiducialResults
+        if (fiducials.isNullOrEmpty()) {
+            if (result.tx != 0.0 || result.ty != 0.0) {
+                val botpose = result.botpose
+                val distInches = if (botpose != null) hypot(botpose.position.x, botpose.position.y) * 39.3701 else 0.0
+                return AprilTagTarget(id = -1, txDegrees = result.tx, distanceInches = distInches, isValid = true)
+            }
+            return null
+        }
+
+        var bestTag: AprilTagTarget? = null
+        var minDistance = Double.MAX_VALUE
+
+        for (fr in fiducials) {
+            val pose = fr.targetPoseCameraSpace
+            val distInches = if (pose != null) sqrt(pose.position.x * pose.position.x + pose.position.y * pose.position.y + pose.position.z * pose.position.z) * 39.3701 else 0.0
+
+            if (distInches > 0.0 && distInches < minDistance) {
+                minDistance = distInches
+                bestTag = AprilTagTarget(id = fr.fiducialId, txDegrees = fr.targetXDegrees, distanceInches = distInches, isValid = true)
+            } else if (bestTag == null) {
+                bestTag = AprilTagTarget(id = fr.fiducialId, txDegrees = fr.targetXDegrees, distanceInches = distInches, isValid = true)
+            }
+        }
+
+        return bestTag
     }
 
     fun stop() {

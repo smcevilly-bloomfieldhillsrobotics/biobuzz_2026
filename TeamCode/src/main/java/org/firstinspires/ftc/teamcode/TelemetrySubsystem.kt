@@ -38,6 +38,60 @@ class TelemetrySubsystem(telemetry: Telemetry) {
         @JvmField var PANELS_PROXY_URL = "http://192.168.43.1:5801"
     }
 
+    fun publishBioBuzzTeleopData(
+        fieldCentric: Boolean,
+        intakeLauncher: IntakeLauncherSubsystem,
+        odometry: OdometrySubsystem,
+        aprilTag: LimelightAimingSubsystem.AprilTagTarget?,
+        flPower: Double,
+        frPower: Double,
+        blPower: Double,
+        brPower: Double,
+        nectarLauncherVel: Double,
+        pollenLauncherVel: Double
+    ) {
+        val packet = TelemetryPacket()
+        packet.put("Drive Mode", if (fieldCentric) "Field-Centric" else "Robot-Centric")
+        packet.put("Nectar Launcher Vel", nectarLauncherVel)
+        packet.put("Nectar Launcher Target", IntakeLauncherSubsystem.NECTAR_TARGET_VELOCITY)
+        packet.put("Pollen Launcher Vel", pollenLauncherVel)
+        packet.put("Pollen Launcher Target", IntakeLauncherSubsystem.POLLEN_TARGET_VELOCITY)
+        packet.put("Intake Power", intakeLauncher.intakePower)
+        packet.put("FL Power", flPower)
+        packet.put("FR Power", frPower)
+        packet.put("BL Power", blPower)
+        packet.put("BR Power", brPower)
+
+        if (aprilTag != null && aprilTag.isValid) {
+            packet.put("AprilTag ID", aprilTag.id)
+            packet.put("AprilTag Distance (in)", aprilTag.distanceInches)
+            packet.put("AprilTag Offset (°)", aprilTag.txDegrees)
+        }
+
+        odometry.update(packet)
+        FtcDashboard.getInstance().sendTelemetryPacket(packet)
+
+        telemetry.addData("--- BioBuzz Mecanum Teleop (Pedro) ---", "")
+        telemetry.addData("Drive Mode", if (fieldCentric) "Field-Centric (Press A to toggle)" else "Robot-Centric (Press A to toggle)")
+        telemetry.addData("Motors (FL, FR, BL, BR)", "%.2f, %.2f, %.2f, %.2f", flPower, frPower, blPower, brPower)
+        telemetry.addData("Controls", "A: Spin Up, RT: Nectar Launcher, LT: Pollen Launcher, RB: Intake, LB: Reverse/Unjam")
+        telemetry.addData("Nectar Launcher Vel", "%.1f ticks/sec (Target: %.0f)", nectarLauncherVel, IntakeLauncherSubsystem.NECTAR_TARGET_VELOCITY)
+        telemetry.addData("Pollen Launcher Vel", "%.1f ticks/sec (Target: %.0f)", pollenLauncherVel, IntakeLauncherSubsystem.POLLEN_TARGET_VELOCITY)
+        telemetry.addData("Intake Power", "%.2f", intakeLauncher.intakePower)
+
+        if (aprilTag != null && aprilTag.isValid) {
+            val tagStr = if (aprilTag.id >= 0) "#${aprilTag.id}" else "Lock"
+            telemetry.addData("Limelight AprilTag", "%s | Distance: %.1f in | Offset: %.1f°", tagStr, aprilTag.distanceInches, aprilTag.txDegrees)
+        } else {
+            telemetry.addData("Limelight AprilTag", "No AprilTag Target Detected")
+        }
+
+        telemetry.addData("--- Odometry (Pinpoint / Pedro) ---", "")
+        telemetry.addData("X Position (in)", "%.2f", odometry.posX)
+        telemetry.addData("Y Position (in)", "%.2f", odometry.posY)
+        telemetry.addData("Heading (deg)", "%.2f", odometry.heading)
+        telemetry.update()
+    }
     fun publishInitStatus(isInitialized: Boolean) {
         telemetry.addData("Camera Init Status", if (isInitialized) "SUCCESS (Connected)" else "FAILED")
         telemetry.addData("Stream URL", LIMELIGHT_IP)

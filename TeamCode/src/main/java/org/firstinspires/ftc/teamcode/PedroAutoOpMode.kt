@@ -3,8 +3,6 @@ package org.firstinspires.ftc.teamcode
 import com.acmerobotics.dashboard.FtcDashboard
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
-import com.pedropathing.api.Paths.curve
-import com.pedropathing.api.Paths.line
 import com.pedropathing.api.PoseFactory
 import com.pedropathing.follower.Follower
 import com.pedropathing.math.Pose
@@ -23,51 +21,13 @@ import java.util.OptionalDouble
 @Autonomous(name = "BioBuzz Autonomous (NextFTC)", group = "Autonomous")
 class PedroAutoOpMode : NextOpMode() {
 
-    private val poseFactory = PoseFactory.degrees()
     private val robot = RobotHardware()
+    private val paths = PedroPaths()
     private lateinit var follower: Follower
-
-    // Poses & Control Points
-    private val startPose: Pose = poseFactory.of(56.0, 8.0, 90.0)
-    private val shootingPose: Pose = poseFactory.of(56.0, 36.0, 90.0)
-    private val reloadingStartPose: Pose = poseFactory.of(34.8, 11.0, 90.0)
-    private val loadGardenPose: Pose = poseFactory.of(11.0, 14.2, 90.0)
-    private val oppositeShootingPose: Pose = poseFactory.of(52.8, 126.9, 270.0)
-
-    private val reloadingControl: Pose = poseFactory.of(56.0, 20.0, 90.0)
-    private val gardenControl: Pose = poseFactory.of(18.0, 12.6, 90.0)
-    private val oppositeShootingControl: Pose = poseFactory.of(18.0, 85.0, 90.0)
-
-    // Path trajectory builders
-    private fun startToShooting(): Path = line(startPose, shootingPose).constant(Math.toRadians(90.0))
-    private fun shootingToReloading(): Path = curve(shootingPose, reloadingControl, reloadingStartPose).constant(Math.toRadians(90.0))
-    private fun reloadingToGarden(): Path = curve(reloadingStartPose, gardenControl, loadGardenPose).constant(Math.toRadians(90.0))
-    private fun gardenToOppositeShooting(): Path = curve(loadGardenPose, oppositeShootingControl, oppositeShootingPose).linear(Math.toRadians(90.0), Math.toRadians(270.0))
 
     private var currentStep = "Initializing"
 
-    private fun executeLaunchCommand(durationMs: Long = 5000L): NextCommand =
-        series(
-            instant {
-                currentStep = "Launching elements for ${durationMs / 1000} seconds"
-                robot.launcher?.velocity = IntakeLauncherSubsystem.TARGET_VELOCITY
-                robot.launcher2?.velocity = IntakeLauncherSubsystem.LAUNCHER_2_TARGET_VELOCITY
-            },
-            delay(800L),
-            instant {
-                robot.leftLauncherServo?.power = 1.0
-                robot.rightLauncherServo?.power = 1.0
-                robot.intake?.power = 0.8
-            },
-            delay(durationMs - 800L),
-            instant {
-                robot.launcher?.velocity = 0.0
-                robot.launcher2?.velocity = 0.0
-                robot.intake?.power = 0.0
-                robot.leftLauncherServo?.power = 0.0
-                robot.rightLauncherServo?.power = 0.0
-            }
-        )
+
 
     override fun onInit() {
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
@@ -116,21 +76,21 @@ class PedroAutoOpMode : NextOpMode() {
                 FtcDashboard.getInstance().sendTelemetryPacket(packet)
             }
 
-        follower.setPose(startPose)
+        follower.setPose(paths.startPose)
         telemetry.addData("Status", "NextFTC Autonomous Ready")
         telemetry.update()
     }
 
     override fun onStartCommand(): NextCommand = series(
         instant { currentStep = "1: Following Path -> Shooting Position" },
-        followPath(follower, startToShooting()),
-        executeLaunchCommand(5000L),
+        followPath(follower, paths.shootingPositionPath),
+        LaunchRoutineCommand(robot, 5000L) { currentStep = "Launching elements for 5 seconds" },
         instant { currentStep = "2: Following Path -> Reloading Start" },
-        followPath(follower, shootingToReloading()),
+        followPath(follower, paths.reloadingStartPath),
         instant { currentStep = "3: Following Path -> Load Garden" },
-        followPath(follower, reloadingToGarden()),
+        followPath(follower, paths.loadGardenPath),
         instant { currentStep = "4: Following Path -> Opposite Shooting" },
-        followPath(follower, gardenToOppositeShooting()),
+        followPath(follower, paths.oppositeShootingPositionPath),
         instant { currentStep = "Autonomous Routine Complete!" }
     )
 

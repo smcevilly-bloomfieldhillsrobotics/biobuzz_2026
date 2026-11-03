@@ -4,23 +4,25 @@ import com.acmerobotics.dashboard.FtcDashboard
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 import com.pedropathing.revhub.drivetrains.Mecanum
-import com.qualcomm.robotcore.eventloop.opmode.OpMode
+import org.firstinspires.ftc.teamcode.nextftc.NextOpMode
+import kotlin.math.pow
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
+import com.pedropathing.drivetrain.DrivePowers
 import kotlin.math.abs
+import kotlin.math.sign
 
 /**
  * A dedicated TeleOp mode focused exclusively on the Intake, Nectar Launcher, and Pollen Launcher subsystems
  * with full driving capability.
  */
 @TeleOp(name = "BioBuzz Launcher Tuning", group = "Test")
-class BioBuzzLauncherTeleop : OpMode() {
+class BioBuzzLauncherTeleop : NextOpMode() {
 
     private val robot = RobotHardware()
     private lateinit var pedroMecanum: Mecanum
     private lateinit var intakeLauncher: IntakeLauncherSubsystem
-    private lateinit var controls: DriverControls
 
-    override fun init() {
+    override fun onInit() {
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
 
         robot.initMecanumDrivetrain(hardwareMap)
@@ -28,53 +30,55 @@ class BioBuzzLauncherTeleop : OpMode() {
 
         pedroMecanum = robot.createPedroMecanum(hardwareMap)
         intakeLauncher = IntakeLauncherSubsystem(robot)
-        controls = DriverControls(GamepadEx(gamepad1), GamepadEx(gamepad2))
+
+        val dpadUpBinding = if (driver2.gamepad.id != -1) driver2.dpadUp else driver1.dpadUp
+        dpadUpBinding.onPress { intakeLauncher.adjustNectarLauncherVelocity(50.0) }
+        
+        val dpadDownBinding = if (driver2.gamepad.id != -1) driver2.dpadDown else driver1.dpadDown
+        dpadDownBinding.onPress { intakeLauncher.adjustNectarLauncherVelocity(-50.0) }
+        
+        val dpadRightBinding = if (driver2.gamepad.id != -1) driver2.dpadRight else driver1.dpadRight
+        dpadRightBinding.onPress { intakeLauncher.adjustPollenLauncherVelocity(50.0) }
+        
+        val dpadLeftBinding = if (driver2.gamepad.id != -1) driver2.dpadLeft else driver1.dpadLeft
+        dpadLeftBinding.onPress { intakeLauncher.adjustPollenLauncherVelocity(-50.0) }
 
         telemetry.addData("Status", "Launcher Subsystem & Drivetrain Ready (1 or 2 Gamepads)")
         telemetry.update()
     }
 
-    override fun loop() {
-        // Update centralized controls (supports single Gamepad 1 or dual Gamepad 1 + 2)
-        controls.update()
+    // Helper for input deadband
+    private fun getDeadbandStick(raw: Float, deadband: Float = 0.05f, exponent: Double = 1.0): Double {
+        if (abs(raw) < deadband) return 0.0
+        val sign = sign(raw.toDouble())
+        val scaled = ((abs(raw) - deadband) / (1.0 - deadband))
+        return sign * abs(scaled).pow(exponent)
+    }
 
-        // Driver 1: Drive controls
-        val powers = controls.drivePowers
-        if (abs(powers.forward()) > 0.05 || abs(powers.strafe()) > 0.05 || abs(powers.turn()) > 0.05) {
-            pedroMecanum.drive(powers, true)
+    override fun onLoop() {
+        val fwdCmd = -getDeadbandStick(driver1.gamepad.left_stick_y)
+        val strCmd = -getDeadbandStick(driver1.gamepad.left_stick_x)
+        val rotCmd = -getDeadbandStick(driver1.gamepad.right_stick_x)
+
+        if (abs(fwdCmd) > 0.05 || abs(strCmd) > 0.05 || abs(rotCmd) > 0.05) {
+            pedroMecanum.drive(DrivePowers(fwdCmd, strCmd, rotCmd), true)
         } else {
             pedroMecanum.stop()
         }
 
-        // Intake and Launcher Controls (Gamepad 2 or Gamepad 1 fallback)
-        // Button A / Y: Spin up Nectar & Pollen launchers
-        // Right Trigger: Feed Nectar Launcher (Right)
-        // Left Trigger: Feed Pollen Launcher (Left)
-        // Right Bumper: Intake Forward
-        // Left Bumper: Reverse Intake & Servos (unjam)
+        val isGamepad2Connected = driver2.gamepad.id != -1
+        val spinUpLaunchers = if (isGamepad2Connected) driver2.gamepad.a else (driver1.gamepad.a || driver1.gamepad.y)
+        val nectarLauncherTrigger = if (isGamepad2Connected) driver2.gamepad.right_trigger else driver1.gamepad.right_trigger
+        val pollenLauncherTrigger = if (isGamepad2Connected) driver2.gamepad.left_trigger else driver1.gamepad.left_trigger
+        val intakeForward = if (isGamepad2Connected) driver2.gamepad.right_bumper else driver1.gamepad.right_bumper
+        val intakeReverse = if (isGamepad2Connected) driver2.gamepad.left_bumper else driver1.gamepad.left_bumper
         intakeLauncher.update(
-            controls.spinUpLaunchers,
-            controls.nectarLauncherTrigger,
-            controls.pollenLauncherTrigger,
-            controls.intakeForward,
-            controls.intakeReverse
+            spinUpLaunchers,
+            nectarLauncherTrigger,
+            pollenLauncherTrigger,
+            intakeForward,
+            intakeReverse
         )
-
-        // Adjust Nectar Launcher Velocity (D-Pad Up/Down)
-        if (controls.nectarVelocityUp) {
-            intakeLauncher.adjustNectarLauncherVelocity(50.0)
-        }
-        if (controls.nectarVelocityDown) {
-            intakeLauncher.adjustNectarLauncherVelocity(-50.0)
-        }
-
-        // Adjust Pollen Launcher Velocity (D-Pad Left/Right)
-        if (controls.pollenVelocityUp) {
-            intakeLauncher.adjustPollenLauncherVelocity(50.0)
-        }
-        if (controls.pollenVelocityDown) {
-            intakeLauncher.adjustPollenLauncherVelocity(-50.0)
-        }
 
         val nectarVel = robot.nectarLauncher?.velocity ?: 0.0
         val pollenVel = robot.pollenLauncher?.velocity ?: 0.0
