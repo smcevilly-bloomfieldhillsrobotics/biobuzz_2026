@@ -203,7 +203,7 @@ class PedroAutoOpMode : LinearOpMode() {
             while (trackingHeadingError > Math.PI) trackingHeadingError -= 2 * Math.PI
             while (trackingHeadingError < -Math.PI) trackingHeadingError += 2 * Math.PI
 
-            updatePoseAndTelemetry()
+            updatePoseAndTelemetry(path)
 
             if (currentT >= 0.95 && distToFinal < 2.0 && abs(Math.toDegrees(finalHeadingError)) < 4.0) {
                 break
@@ -362,9 +362,9 @@ class PedroAutoOpMode : LinearOpMode() {
         return tagSeen
     }
 
-    private fun updatePoseAndTelemetry() {
+    private fun updatePoseAndTelemetry(activePath: Path? = null) {
         odometry.update(null)
-        updateAutoTelemetry(odometry.posX, odometry.posY, odometry.heading)
+        updateAutoTelemetry(odometry.posX, odometry.posY, odometry.heading, activePath = activePath)
     }
 
     private fun updateAutoTelemetry(
@@ -377,7 +377,8 @@ class PedroAutoOpMode : LinearOpMode() {
         limelightOk: Boolean = (robot.limelight?.status?.fps ?: 0.0) > 0.0,
         motorsOk: Boolean = robot.frontLeftDrive != null && robot.frontRightDrive != null && robot.backLeftDrive != null && robot.backRightDrive != null,
         launchersOk: Boolean = robot.launcher != null && robot.launcher2 != null,
-        pinpointStatus: GoBildaPinpointDriver.DeviceStatus? = robot.pinpoint?.deviceStatus
+        pinpointStatus: GoBildaPinpointDriver.DeviceStatus? = robot.pinpoint?.deviceStatus,
+        activePath: Path? = null
     ) {
         val launcherVel = robot.launcher?.velocity ?: 0.0
         val launcher2Vel = robot.launcher2?.velocity ?: 0.0
@@ -398,8 +399,8 @@ class PedroAutoOpMode : LinearOpMode() {
         packet.put("FR Power", frPower)
         packet.put("BL Power", blPower)
         packet.put("BR Power", brPower)
-        packet.put("Launcher 1 Vel", launcherVel)
-        packet.put("Launcher 2 Vel", launcher2Vel)
+        packet.put("Nectar Launcher Vel", launcherVel)
+        packet.put("Pollen Launcher Vel", launcher2Vel)
 
         packet.put("HW: Pinpoint Odometry", if (pinpointOk) "OK (${pinpointStatus?.name ?: "READY"})" else "FAILED (${pinpointStatus?.name ?: "OFFLINE"})")
         packet.put("HW: Limelight Camera", if (limelightOk) "OK" else "OFFLINE")
@@ -418,14 +419,14 @@ class PedroAutoOpMode : LinearOpMode() {
             packet.put("Tag Range Error (in)", tag.distanceInches - targetDistanceInches)
         }
 
-        // Draw BioBuzz Field & Robot Overlay on FTC Dashboard
-        drawBioBuzzFieldOverlay(packet.fieldOverlay(), x, y, headingDeg)
+        // Draw Pedro Pathing Field & Robot Overlay on FTC Dashboard
+        drawBioBuzzFieldOverlay(packet.fieldOverlay(), x, y, headingDeg, activePath)
 
         FtcDashboard.getInstance().sendTelemetryPacket(packet)
 
         telemetry.addData("--- Pedro Autonomous Status ---", "")
         telemetry.addData("Step", currentStep)
-        telemetry.addData("Pose (Live Inspection)", "X: %.2f in, Y: %.2f in, Heading: %.1f°", x, y, headingDeg)
+        telemetry.addData("Pose (Live Inspection)", "X: %.2f in, Y: %.2f in (Bottom Wall = 0\", Top Wall = 144\") | Heading: %.1f°", x, y, headingDeg)
 
         telemetry.addData("--- Hardware Inspection ---", "")
         val pinpointStatusStr = pinpointStatus?.name ?: if (pinpointOk) "READY" else "NOT CONNECTED"
@@ -436,7 +437,7 @@ class PedroAutoOpMode : LinearOpMode() {
 
         telemetry.addData("--- Subsystem Metrics ---", "")
         telemetry.addData("Motors", "FL: %.2f, FR: %.2f, BL: %.2f, BR: %.2f", flPower, frPower, blPower, brPower)
-        telemetry.addData("Launchers", "L1: %.0f, L2: %.0f", launcherVel, launcher2Vel)
+        telemetry.addData("Launchers", "Nectar: %.0f, Pollen: %.0f", launcherVel, launcher2Vel)
 
         val activeTag = tag ?: getAprilTagTarget()
         if (activeTag != null && activeTag.isValid) {
@@ -449,29 +450,30 @@ class PedroAutoOpMode : LinearOpMode() {
         telemetry.update()
     }
 
-    private fun drawBioBuzzFieldOverlay(fieldOverlay: Canvas, robotX: Double, robotY: Double, headingDeg: Double) {
-        // Field Perimeter (144" x 144")
+    private fun drawBioBuzzFieldOverlay(fieldOverlay: Canvas, robotX: Double, robotY: Double, headingDeg: Double, activePath: Path? = null) {
+        // Field Outer Perimeter (144" x 144")
         fieldOverlay.setStroke("#52525B")
         fieldOverlay.strokeRect(0.0, 0.0, 144.0, 144.0)
 
-        // Red HIVE
-        fieldOverlay.setStroke("#DC2626")
-        fieldOverlay.strokeRect(46.0, 50.0, 2.6, 41.4)
+        // Draw Active Pedro Path Trajectory Line & Endpoint
+        activePath?.let { path ->
+            val curve = path.curve
+            val px = DoubleArray(21)
+            val py = DoubleArray(21)
+            for (i in 0..20) {
+                val pt = curve.get(i / 20.0)
+                px[i] = pt.x()
+                py[i] = pt.y()
+            }
+            fieldOverlay.setStroke("#3B82F6") // Blue path curve
+            fieldOverlay.strokePolyline(px, py)
 
-        // Blue HIVE
-        fieldOverlay.setStroke("#2563EB")
-        fieldOverlay.strokeRect(93.9, 50.0, 2.6, 41.4)
+            val end = path.endPose()
+            fieldOverlay.setStroke("#F44336") // Red target point
+            fieldOverlay.strokeCircle(end.x(), end.y(), 3.0)
+        }
 
-        // FLOWER Stations
-        fieldOverlay.setStroke("#EF4444")
-        fieldOverlay.strokeCircle(46.75, 139.5, 4.0) // Top Scoring FLOWER
-        fieldOverlay.strokeCircle(2.0, 47.0, 4.0)   // Red Alliance FLOWER
-
-        fieldOverlay.setStroke("#3B82F6")
-        fieldOverlay.strokeCircle(94.5, 2.0, 4.0)   // Audience FLOWER
-        fieldOverlay.strokeCircle(139.5, 94.75, 4.0)// Blue Alliance FLOWER
-
-        // Robot Body (18" x 18" Circle & Heading Line)
+        // Robot Body (18" x 18" Circle & Heading Direction Line)
         fieldOverlay.setStroke("#22C55E")
         fieldOverlay.strokeCircle(robotX, robotY, 9.0)
 

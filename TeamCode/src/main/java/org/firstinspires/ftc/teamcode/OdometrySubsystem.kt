@@ -28,8 +28,6 @@ import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D
-import kotlin.math.cos
-import kotlin.math.sin
 
 /**
  * OdometrySubsystem manages the goBILDA Pinpoint Odometry Computer for precise 
@@ -85,14 +83,6 @@ class OdometrySubsystem(private val robot: RobotHardware) {
             put("Odometry X (in)", posX)
             put("Odometry Y (in)", posY)
             put("Odometry Heading (deg)", heading)
-
-            // Draw robot on field overlay for FTC Dashboard field view
-            val fieldOverlay = fieldOverlay()
-            fieldOverlay.setStroke("#3F51B5")
-            fieldOverlay.strokeCircle(posX, posY, 9.0)
-            val headingRad = Math.toRadians(heading)
-            val length = 12.0
-            fieldOverlay.strokeLine(posX, posY, posX + (length * cos(headingRad)), posY + (length * sin(headingRad)))
         }
     }
 
