@@ -193,10 +193,11 @@ class RobotHardware {
     }
 
     fun initPinpoint(hardwareMap: HardwareMap) {
-        for (name in PINPOINT_NAMES) {
+        val pinpointNames = arrayOf(PedroConstants.PINPOINT_DEVICE_NAME) + PINPOINT_NAMES
+        for (name in pinpointNames) {
             try {
                 pinpoint = hardwareMap[GoBildaPinpointDriver::class.java, name]?.apply {
-                    setOffsets(OdometrySubsystem.X_POD_OFFSET_MM, OdometrySubsystem.Y_POD_OFFSET_MM, DistanceUnit.MM)
+                    setOffsets(PedroConstants.X_POD_OFFSET_MM, PedroConstants.Y_POD_OFFSET_MM, DistanceUnit.MM)
                     setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
                     setEncoderDirections(
                         GoBildaPinpointDriver.EncoderDirection.REVERSED,

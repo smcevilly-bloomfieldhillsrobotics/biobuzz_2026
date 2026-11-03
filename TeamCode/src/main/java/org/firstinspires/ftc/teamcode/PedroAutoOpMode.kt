@@ -1,118 +1,83 @@
 package org.firstinspires.ftc.teamcode
 
 import com.acmerobotics.dashboard.FtcDashboard
-import com.acmerobotics.dashboard.canvas.Canvas
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
-import com.acmerobotics.dashboard.telemetry.TelemetryPacket
-import com.pedropathing.drivetrain.DrivePowers
+import com.pedropathing.api.Paths.curve
+import com.pedropathing.api.Paths.line
+import com.pedropathing.api.PoseFactory
+import com.pedropathing.follower.Follower
 import com.pedropathing.ivy.Command
 import com.pedropathing.ivy.Scheduler
-import com.pedropathing.ivy.commands.Commands.*
+import com.pedropathing.ivy.Scheduler.schedule
+import com.pedropathing.ivy.behaviors.EndCondition
+import com.pedropathing.ivy.commands.Commands.conditional
+import com.pedropathing.ivy.commands.Commands.instant
 import com.pedropathing.ivy.groups.Groups.sequential
-import com.pedropathing.math.Vector2D
+import com.pedropathing.math.Pose
 import com.pedropathing.paths.Path
-import com.pedropathing.revhub.drivetrains.Mecanum
+import com.pedropathing.revhub.localizers.PinpointConfig
+import com.pedropathing.revhub.localizers.PinpointLocalizer
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
-import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.hypot
-import kotlin.math.sin
-import kotlin.math.sqrt
+import com.qualcomm.robotcore.eventloop.opmode.OpMode
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 
 /**
- * Autonomous OpMode for BioBuzz StarterBot using Pedro Pathing 3.0, Pinpoint Odometry,
- * and Pedro Pathing's Ivy Command Scheduler framework.
+ * Autonomous OpMode for BioBuzz StarterBot using Pedro Pathing 3.0, native PinpointLocalizer,
+ * and Ivy Command Scheduler.
  */
 @Autonomous(name = "BioBuzz Autonomous (Pedro Pathing)", group = "Autonomous")
-class PedroAutoOpMode : LinearOpMode() {
+class PedroAutoOpMode : OpMode() {
 
-    companion object {
-        const val DESIRED_TAG_DISTANCE_INCHES = 24.0
-        const val METERS_TO_INCHES = 39.3701
-        const val SPEED_P = 0.025
-        const val TURN_P = 0.015
-        const val MAX_APPROACH_SPEED = 0.40
-        const val MAX_APPROACH_TURN = 0.30
-    }
-
+    private val poseFactory = PoseFactory.degrees()
     private val robot = RobotHardware()
-    private lateinit var pedroMecanum: Mecanum
-    private lateinit var odometry: OdometrySubsystem
-    private val paths = PedroPaths()
+    private lateinit var follower: Follower
+
+    /**
+     * Native Pedro Pathing Ivy follow command wrapper.
+     */
+    private fun follow(follower: Follower, path: Path): Command =
+        Command.build()
+            .setStart {
+                follower.follow(path)
+                follower.update()
+            }
+            .setExecute { follower.update() }
+            .setDone { !follower.isBusy() }
+            .setEnd { interrupted ->
+                if (interrupted == EndCondition.INTERRUPTED) {
+                    follower.stop()
+                }
+            }
+
+    // Poses
+    private val startPose: Pose = poseFactory.of(56.0, 8.0, 90.0)
+    private val shootingPose: Pose = poseFactory.of(56.0, 36.0, 90.0)
+    private val reloadingStartPose: Pose = poseFactory.of(34.8, 11.0, 90.0)
+    private val loadGardenPose: Pose = poseFactory.of(0.8, 14.2, 90.0)
+    private val oppositeShootingPose: Pose = poseFactory.of(52.8, 126.9, 270.0)
+
+    // Control Points
+    private val reloadingControl: Pose = poseFactory.of(56.0, 20.0, 90.0)
+    private val gardenControl: Pose = poseFactory.of(17.8, 12.6, 90.0)
+    private val oppositeShootingControl: Pose = poseFactory.of(10.0, 85.0, 90.0)
+
+    // Path methods
+    private fun startToShooting(): Path =
+        line(startPose, shootingPose).constant(Math.toRadians(90.0))
+
+    private fun shootingToReloading(): Path =
+        curve(shootingPose, reloadingControl, reloadingStartPose).constant(Math.toRadians(90.0))
+
+    private fun reloadingToGarden(): Path =
+        curve(reloadingStartPose, gardenControl, loadGardenPose).constant(Math.toRadians(90.0))
+
+    private fun gardenToOppositeShooting(): Path =
+        curve(loadGardenPose, oppositeShootingControl, oppositeShootingPose)
+            .linear(Math.toRadians(90.0), Math.toRadians(270.0))
+
     private var currentStep = "Initializing"
 
-    /**
-     * Builds a non-blocking Ivy Command for trajectory path following.
-     */
-    private fun followPathCommand(path: Path, stepLabel: String): Command {
-        val curve = path.curve
-        val finalTargetPose = path.endPose()
-        var currentT = 0.0
-        var isDone = false
-
-        return Command.build()
-            .setStart {
-                currentStep = stepLabel
-                currentT = 0.0
-                isDone = false
-            }
-            .setExecute {
-                odometry.update(null)
-                val currentX = odometry.posX
-                val currentY = odometry.posY
-                val currentHeadingRad = Math.toRadians(odometry.heading)
-
-                val posVec = Vector2D.cartesian(currentX, currentY)
-                val measuredT = curve.closestParameter(posVec, currentT)
-                currentT = maxOf(currentT, measuredT.coerceIn(0.0, 1.0))
-
-                val curveLength = maxOf(curve.length(), 0.01)
-                val lookAheadT = (currentT + (12.0 / curveLength)).coerceIn(0.0, 1.0)
-                val targetVec = curve.get(lookAheadT)
-                val targetHeading = path.heading(lookAheadT)
-
-                val dx = targetVec.x() - currentX
-                val dy = targetVec.y() - currentY
-
-                val distToFinal = hypot(finalTargetPose.x() - currentX, finalTargetPose.y() - currentY)
-                var finalHeadingError = finalTargetPose.heading() - currentHeadingRad
-                while (finalHeadingError > Math.PI) finalHeadingError -= 2 * Math.PI
-                while (finalHeadingError < -Math.PI) finalHeadingError += 2 * Math.PI
-
-                var trackingHeadingError = targetHeading - currentHeadingRad
-                while (trackingHeadingError > Math.PI) trackingHeadingError -= 2 * Math.PI
-                while (trackingHeadingError < -Math.PI) trackingHeadingError += 2 * Math.PI
-
-                if (currentT >= 0.95 && distToFinal < 2.0 && abs(Math.toDegrees(finalHeadingError)) < 4.0) {
-                    pedroMecanum.stop()
-                    isDone = true
-                    return@setExecute
-                }
-
-                val fieldXCmd = (dx * 0.065).coerceIn(-0.65, 0.65)
-                val fieldYCmd = (dy * 0.065).coerceIn(-0.65, 0.65)
-                val turnPower = (trackingHeadingError * 0.7).coerceIn(-0.4, 0.4)
-
-                val cosH = cos(currentHeadingRad)
-                val sinH = sin(currentHeadingRad)
-
-                val robotForward = fieldXCmd * cosH + fieldYCmd * sinH
-                val robotStrafe = -fieldXCmd * sinH + fieldYCmd * cosH
-
-                pedroMecanum.drive(DrivePowers(robotForward, robotStrafe, turnPower), true)
-                updateAutoTelemetry(currentX, currentY, odometry.heading, activePath = path)
-            }
-            .setDone { isDone }
-            .setEnd {
-                pedroMecanum.stop()
-            }
-    }
-
-    /**
-     * Builds a non-blocking Ivy Command for launching game elements.
-     */
     private fun executeLaunchCommand(launchDurationMs: Long): Command {
         var startTimeMs = 0L
         var flywheelsReady = false
@@ -148,8 +113,6 @@ class PedroAutoOpMode : LinearOpMode() {
                     robot.rightLauncherServo?.power = 0.0
                 }
 
-                updatePoseAndTelemetry()
-
                 if (now - startTimeMs >= launchDurationMs) {
                     isDone = true
                 }
@@ -164,9 +127,6 @@ class PedroAutoOpMode : LinearOpMode() {
             }
     }
 
-    /**
-     * Builds the complete autonomous routine sequence using Ivy Command Groups.
-     */
     private fun autoRoutine(): Command {
         var aprilTagFound = false
         var tagWaitStart = 0L
@@ -184,7 +144,6 @@ class PedroAutoOpMode : LinearOpMode() {
                     if (tag != null && tag.isValid) {
                         aprilTagFound = true
                     }
-                    updatePoseAndTelemetry()
                 }
                 .setDone { aprilTagFound || (System.currentTimeMillis() - tagWaitStart) >= 5000L },
 
@@ -195,20 +154,19 @@ class PedroAutoOpMode : LinearOpMode() {
                 instant { currentStep = "No AprilTag detected within 5s - Proceeding to paths" }
             ),
 
-            // 3. Traversal Sequence
-            followPathCommand(paths.startPath(), "1: Following Path -> Shooting Position (56.0, 36.0, 90°)"),
-            followPathCommand(paths.reloadingStartPath(), "2: Following Path -> Reloading Start (34.80, 10.97, 90°)"),
-            followPathCommand(paths.loadGardenPath(), "3: Following Path -> Load Garden (0.83, 14.19, 90°)"),
-            followPathCommand(paths.oppositeShootingPositionPath(), "4: Following Path -> Opposite Shooting (52.82, 126.89, 270°)"),
+            // 3. Traversal Sequence using Pedro Pathing native Follower
+            follow(follower, startToShooting()),
+            follow(follower, shootingToReloading()),
+            follow(follower, reloadingToGarden()),
+            follow(follower, gardenToOppositeShooting()),
 
             instant {
                 currentStep = "Complete! Holding final position"
-                pedroMecanum.stop()
             }
         )
     }
 
-    override fun runOpMode() {
+    override fun init() {
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
 
         Scheduler.reset()
@@ -216,72 +174,39 @@ class PedroAutoOpMode : LinearOpMode() {
         robot.initMecanumDrivetrain(hardwareMap)
         robot.initIntakeAndLauncher(hardwareMap)
         robot.initLimelight(hardwareMap)
-        robot.initPinpoint(hardwareMap)
 
-        pedroMecanum = robot.createPedroMecanum(hardwareMap)
-        odometry = OdometrySubsystem(robot)
+        val pedroMecanum = robot.createPedroMecanum(hardwareMap)
+        val pinpointLocalizer = PinpointLocalizer(hardwareMap, PinpointConfig { c ->
+            c.name.set(PedroConstants.PINPOINT_DEVICE_NAME)
+            c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.REVERSED)
+            c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD)
+            c.xPodOffset.set(PedroConstants.X_POD_OFFSET_MM)
+            c.yPodOffset.set(PedroConstants.Y_POD_OFFSET_MM)
+            c.offsetUnits.set(DistanceUnit.MM)
+        })
 
-        // Initialize odometry to default startPose (56.0, 8.0, 90°)
-        val startX = paths.startPose.x()
-        val startY = paths.startPose.y()
-        val startHeadingDeg = Math.toDegrees(paths.startPose.heading())
+        follower = Follower(pinpointLocalizer, pedroMecanum, null)
+        follower.setPose(startPose)
 
-        odometry.resetPosition(startX, startY, startHeadingDeg)
+        telemetry.addData("Status", "Pedro Pathing Autonomous Initialized")
+        telemetry.update()
+    }
 
-        // Continuous init inspection loop until START button is pressed
-        currentStep = "Init - Hardware Verification & Pose Inspection"
-        var poseInitializedOnReady = false
+    override fun start() {
+        schedule(autoRoutine())
+    }
 
-        while (!isStarted && !isStopRequested) {
-            val pinpointStatus = robot.pinpoint?.deviceStatus
-            val pinpointOk = robot.pinpoint != null && pinpointStatus == GoBildaPinpointDriver.DeviceStatus.READY
+    override fun loop() {
+        follower.update()
+        Scheduler.execute()
 
-            // Re-apply starting pose as soon as Pinpoint finishes IMU calibration during init
-            if (pinpointOk && !poseInitializedOnReady) {
-                odometry.resetPosition(startX, startY, startHeadingDeg)
-                poseInitializedOnReady = true
-            }
-
-            odometry.update(null)
-
-            val limelightStatus = robot.limelight?.status
-            val limelightOk = (limelightStatus?.fps ?: 0.0) > 0.0
-            val motorsOk = robot.frontLeftDrive != null && robot.frontRightDrive != null &&
-                           robot.backLeftDrive != null && robot.backRightDrive != null
-            val launchersOk = robot.launcher != null && robot.launcher2 != null
-
-            val currentTag = getAprilTagTarget()
-
-            updateAutoTelemetry(
-                x = odometry.posX,
-                y = odometry.posY,
-                headingDeg = odometry.heading,
-                tag = currentTag,
-                pinpointOk = pinpointOk,
-                limelightOk = limelightOk,
-                motorsOk = motorsOk,
-                launchersOk = launchersOk,
-                pinpointStatus = pinpointStatus
-            )
-
-            sleep(30)
-        }
-
-        if (!opModeIsActive()) return
-
-        // Confirm start position at the moment START button is pressed
-        odometry.resetPosition(startX, startY, startHeadingDeg)
-
-        // Schedule autonomous routine using Ivy Command Scheduler
-        Scheduler.schedule(autoRoutine())
-
-        while (opModeIsActive() && !isStopRequested) {
-            Scheduler.execute()
-            sleep(15)
-        }
-
-        Scheduler.reset()
-        pedroMecanum.stop()
+        val pose = follower.pose()
+        telemetry.addData("--- Pedro Autonomous Status ---", "")
+        telemetry.addData("Step", currentStep)
+        telemetry.addData("X", pose.x())
+        telemetry.addData("Y", pose.y())
+        telemetry.addData("Heading", Math.toDegrees(pose.heading()))
+        telemetry.update()
     }
 
     data class AprilTagTarget(
@@ -303,7 +228,7 @@ class PedroAutoOpMode : LinearOpMode() {
         if (fiducials.isNullOrEmpty()) {
             if (result.tx != 0.0 || result.ty != 0.0) {
                 val botpose = result.botpose
-                val distInches = if (botpose != null) hypot(botpose.position.x, botpose.position.y) * METERS_TO_INCHES else 0.0
+                val distInches = if (botpose != null) Math.hypot(botpose.position.x, botpose.position.y) * 39.3701 else 0.0
                 return AprilTagTarget(id = -1, txDegrees = result.tx, distanceInches = distInches, isValid = true)
             }
             return null
@@ -314,7 +239,7 @@ class PedroAutoOpMode : LinearOpMode() {
 
         for (fr in fiducials) {
             val pose = fr.targetPoseCameraSpace
-            val distInches = if (pose != null) sqrt(pose.position.x * pose.position.x + pose.position.y * pose.position.y + pose.position.z * pose.position.z) * METERS_TO_INCHES else 0.0
+            val distInches = if (pose != null) Math.sqrt(pose.position.x * pose.position.x + pose.position.y * pose.position.y + pose.position.z * pose.position.z) * 39.3701 else 0.0
 
             if (distInches > 0.0 && distInches < minDistance) {
                 minDistance = distInches
@@ -325,171 +250,5 @@ class PedroAutoOpMode : LinearOpMode() {
         }
 
         return bestTag
-    }
-
-    private fun approachAprilTagIfDetected(targetDistanceInches: Double, timeoutSec: Double = 3.0): Boolean {
-        val startTime = System.currentTimeMillis()
-        var tagSeen = false
-
-        while (opModeIsActive() && ((System.currentTimeMillis() - startTime) < (timeoutSec * 1000))) {
-            val tag = getAprilTagTarget()
-            odometry.update(null)
-
-            if (tag != null && tag.isValid) {
-                tagSeen = true
-                val bearingErrorDeg = tag.txDegrees
-                val rangeErrorInches = if (tag.distanceInches > 0.0) tag.distanceInches - targetDistanceInches else 0.0
-
-                updateAutoTelemetry(odometry.posX, odometry.posY, odometry.heading, tag, targetDistanceInches)
-
-                if (abs(bearingErrorDeg) < 2.0 && (tag.distanceInches == 0.0 || abs(rangeErrorInches) < 1.5)) {
-                    currentStep = "Limelight Tag Alignment Achieved"
-                    break
-                }
-
-                val forwardPower = if (tag.distanceInches > 0.0) (rangeErrorInches * SPEED_P).coerceIn(-MAX_APPROACH_SPEED, MAX_APPROACH_SPEED) else 0.0
-                val turnPower = (bearingErrorDeg * TURN_P).coerceIn(-MAX_APPROACH_TURN, MAX_APPROACH_TURN)
-
-                pedroMecanum.drive(DrivePowers(forwardPower, 0.0, turnPower), true)
-            } else {
-                pedroMecanum.stop()
-                currentStep = if (tagSeen) "Lost Tag View - Holding" else "Searching for Tag..."
-                updateAutoTelemetry(odometry.posX, odometry.posY, odometry.heading)
-            }
-
-            sleep(20)
-        }
-
-        pedroMecanum.stop()
-        return tagSeen
-    }
-
-    private fun updatePoseAndTelemetry(activePath: Path? = null) {
-        odometry.update(null)
-        updateAutoTelemetry(odometry.posX, odometry.posY, odometry.heading, activePath = activePath)
-    }
-
-    private fun updateAutoTelemetry(
-        x: Double,
-        y: Double,
-        headingDeg: Double,
-        tag: AprilTagTarget? = null,
-        targetDistanceInches: Double = DESIRED_TAG_DISTANCE_INCHES,
-        pinpointOk: Boolean = robot.pinpoint != null,
-        limelightOk: Boolean = (robot.limelight?.status?.fps ?: 0.0) > 0.0,
-        motorsOk: Boolean = robot.frontLeftDrive != null && robot.frontRightDrive != null && robot.backLeftDrive != null && robot.backRightDrive != null,
-        launchersOk: Boolean = robot.launcher != null && robot.launcher2 != null,
-        pinpointStatus: GoBildaPinpointDriver.DeviceStatus? = robot.pinpoint?.deviceStatus,
-        activePath: Path? = null
-    ) {
-        val launcherVel = robot.launcher?.velocity ?: 0.0
-        val launcher2Vel = robot.launcher2?.velocity ?: 0.0
-        val limelightStatus = robot.limelight?.status
-
-        val wheelPowers = pedroMecanum.wheelPowers
-        val flPower = if (wheelPowers.isNotEmpty()) wheelPowers[0] else 0.0
-        val frPower = if (wheelPowers.size > 1) wheelPowers[1] else 0.0
-        val blPower = if (wheelPowers.size > 2) wheelPowers[2] else 0.0
-        val brPower = if (wheelPowers.size > 3) wheelPowers[3] else 0.0
-
-        val packet = TelemetryPacket()
-        packet.put("Auto Step", currentStep)
-        packet.put("Auto X (in)", x)
-        packet.put("Auto Y (in)", y)
-        packet.put("Auto Heading (deg)", headingDeg)
-        packet.put("FL Power", flPower)
-        packet.put("FR Power", frPower)
-        packet.put("BL Power", blPower)
-        packet.put("BR Power", brPower)
-        packet.put("Nectar Launcher Vel", launcherVel)
-        packet.put("Pollen Launcher Vel", launcher2Vel)
-
-        packet.put("HW: Pinpoint Odometry", if (pinpointOk) "OK (${pinpointStatus?.name ?: "READY"})" else "FAILED (${pinpointStatus?.name ?: "OFFLINE"})")
-        packet.put("HW: Limelight Camera", if (limelightOk) "OK" else "OFFLINE")
-        packet.put("HW: Drivetrain Motors", if (motorsOk) "OK" else "INCOMPLETE")
-        packet.put("HW: Launcher Flywheels", if (launchersOk) "OK" else "INCOMPLETE")
-
-        if (limelightStatus != null) {
-            packet.put("Limelight FPS", limelightStatus.fps)
-            packet.put("Limelight Temp (°C)", limelightStatus.temp)
-        }
-
-        if (tag != null && tag.isValid) {
-            packet.put("Target Tag ID", tag.id)
-            packet.put("Tag Bearing Error (°)", tag.txDegrees)
-            packet.put("Tag Distance (in)", tag.distanceInches)
-            packet.put("Tag Range Error (in)", tag.distanceInches - targetDistanceInches)
-        }
-
-        // Draw Pedro Pathing Field & Robot Overlay on FTC Dashboard
-        drawBioBuzzFieldOverlay(packet.fieldOverlay(), x, y, headingDeg, activePath)
-
-        FtcDashboard.getInstance().sendTelemetryPacket(packet)
-
-        telemetry.addData("--- Pedro Autonomous Status ---", "")
-        telemetry.addData("Step", currentStep)
-        telemetry.addData("Pose (Live Inspection)", "X: %.2f in, Y: %.2f in (Bottom Wall = 0\", Top Wall = 144\") | Heading: %.1f°", x, y, headingDeg)
-
-        telemetry.addData("--- Hardware Inspection ---", "")
-        val pinpointStatusStr = pinpointStatus?.name ?: if (pinpointOk) "READY" else "NOT CONNECTED"
-        telemetry.addData("Pinpoint Odometry", "%s (%s)", if (pinpointOk) "OPERATIONAL" else "FAULT/OFFLINE", pinpointStatusStr)
-        telemetry.addData("Limelight Camera", if (limelightOk) "ONLINE (%.0f FPS)" else "OFFLINE", limelightStatus?.fps ?: 0.0)
-        telemetry.addData("Mecanum Drivetrain", if (motorsOk) "OPERATIONAL (4 Motors)" else "MOTOR MISSING")
-        telemetry.addData("Launcher Flywheels", if (launchersOk) "OPERATIONAL (Dual Motors)" else "MOTOR MISSING")
-
-        telemetry.addData("--- Subsystem Metrics ---", "")
-        telemetry.addData("Motors", "FL: %.2f, FR: %.2f, BL: %.2f, BR: %.2f", flPower, frPower, blPower, brPower)
-        telemetry.addData("Launchers", "Nectar: %.0f, Pollen: %.0f", launcherVel, launcher2Vel)
-
-        val activeTag = tag ?: getAprilTagTarget()
-        if (activeTag != null && activeTag.isValid) {
-            val tagIdStr = if (activeTag.id >= 0) "#${activeTag.id}" else "Lock"
-            telemetry.addData("Limelight AprilTag", "%s | Dist: %.1f in | Offset: %.1f°",
-                tagIdStr, activeTag.distanceInches, activeTag.txDegrees)
-        } else {
-            telemetry.addData("Limelight AprilTag", "No AprilTag Target Detected")
-        }
-        telemetry.update()
-    }
-
-    private fun drawBioBuzzFieldOverlay(fieldOverlay: Canvas, robotX: Double, robotY: Double, headingDeg: Double, activePath: Path? = null) {
-        // Field Outer Perimeter (144" x 144")
-        fieldOverlay.setStroke("#52525B")
-        fieldOverlay.setStrokeWidth(1)
-        fieldOverlay.strokeRect(0.0, 0.0, 144.0, 144.0)
-
-        // Draw Active Pedro Path Trajectory Line & Endpoint
-        activePath?.let { path ->
-            val curve = path.curve
-            val px = DoubleArray(21)
-            val py = DoubleArray(21)
-            for (i in 0..20) {
-                val pt = curve.get(i / 20.0)
-                px[i] = pt.x()
-                py[i] = pt.y()
-            }
-            fieldOverlay.setStroke("#3B82F6") // Blue path curve
-            fieldOverlay.setStrokeWidth(2)
-            fieldOverlay.strokePolyline(px, py)
-
-            val end = path.endPose()
-            fieldOverlay.setStroke("#F44336") // Red target point
-            fieldOverlay.setStrokeWidth(2)
-            fieldOverlay.strokeCircle(end.x(), end.y(), 3.0)
-        }
-
-        // Robot Body (18" x 18" Circle & Heading Direction Line)
-        fieldOverlay.setStroke("#22C55E")
-        fieldOverlay.setStrokeWidth(2)
-        fieldOverlay.strokeCircle(robotX, robotY, 9.0)
-
-        val headingRad = Math.toRadians(headingDeg)
-        val length = 12.0
-        fieldOverlay.strokeLine(
-            robotX,
-            robotY,
-            robotX + length * cos(headingRad),
-            robotY + length * sin(headingRad)
-        )
     }
 }

@@ -3,7 +3,6 @@ package org.firstinspires.ftc.teamcode
 import com.acmerobotics.dashboard.FtcDashboard
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
-import com.pedropathing.drivetrain.DrivePowers
 import com.pedropathing.revhub.drivetrains.Mecanum
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
@@ -19,12 +18,7 @@ class BioBuzzLauncherTeleop : OpMode() {
     private val robot = RobotHardware()
     private lateinit var pedroMecanum: Mecanum
     private lateinit var intakeLauncher: IntakeLauncherSubsystem
-    
-    // State tracking for edge-detection on D-Pad buttons
-    private var lastDpadRight = false
-    private var lastDpadLeft = false
-    private var lastDpadUp = false
-    private var lastDpadDown = false
+    private lateinit var controls: DriverControls
 
     override fun init() {
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
@@ -34,55 +28,53 @@ class BioBuzzLauncherTeleop : OpMode() {
 
         pedroMecanum = robot.createPedroMecanum(hardwareMap)
         intakeLauncher = IntakeLauncherSubsystem(robot)
+        controls = DriverControls(GamepadEx(gamepad1), GamepadEx(gamepad2))
 
-        telemetry.addData("Status", "Launcher Subsystem & Drivetrain Ready")
+        telemetry.addData("Status", "Launcher Subsystem & Drivetrain Ready (1 or 2 Gamepads)")
         telemetry.update()
     }
 
     override fun loop() {
-        // Driver 1: Drive controls
-        val forward = -gamepad1.left_stick_y.toDouble()
-        val strafe = -gamepad1.left_stick_x.toDouble()
-        val rotate = -gamepad1.right_stick_x.toDouble()
+        // Update centralized controls (supports single Gamepad 1 or dual Gamepad 1 + 2)
+        controls.update()
 
-        if (abs(forward) > 0.05 || abs(strafe) > 0.05 || abs(rotate) > 0.05) {
-            pedroMecanum.drive(DrivePowers(forward, strafe, rotate), true)
+        // Driver 1: Drive controls
+        val powers = controls.drivePowers
+        if (abs(powers.forward()) > 0.05 || abs(powers.strafe()) > 0.05 || abs(powers.turn()) > 0.05) {
+            pedroMecanum.drive(powers, true)
         } else {
             pedroMecanum.stop()
         }
-        // Driver 1: Controls Intake and Launchers (for standalone testing)
-        // Button A: Spin up Nectar & Pollen launchers to target velocity
+
+        // Intake and Launcher Controls (Gamepad 2 or Gamepad 1 fallback)
+        // Button A / Y: Spin up Nectar & Pollen launchers
         // Right Trigger: Feed Nectar Launcher (Right)
         // Left Trigger: Feed Pollen Launcher (Left)
-        // Right Bumper: Run intake forwards
-        // Left Bumper: Reverse intake & servos (unjam)
+        // Right Bumper: Intake Forward
+        // Left Bumper: Reverse Intake & Servos (unjam)
         intakeLauncher.update(
-            gamepad1.a,
-            gamepad1.right_trigger,
-            gamepad1.left_trigger,
-            gamepad1.right_bumper,
-            gamepad1.left_bumper
+            controls.spinUpLaunchers,
+            controls.nectarLauncherTrigger,
+            controls.pollenLauncherTrigger,
+            controls.intakeForward,
+            controls.intakeReverse
         )
 
         // Adjust Nectar Launcher Velocity (D-Pad Up/Down)
-        if (gamepad1.dpad_up && !lastDpadUp) {
+        if (controls.nectarVelocityUp) {
             intakeLauncher.adjustNectarLauncherVelocity(50.0)
         }
-        if (gamepad1.dpad_down && !lastDpadDown) {
+        if (controls.nectarVelocityDown) {
             intakeLauncher.adjustNectarLauncherVelocity(-50.0)
         }
-        lastDpadUp = gamepad1.dpad_up
-        lastDpadDown = gamepad1.dpad_down
 
         // Adjust Pollen Launcher Velocity (D-Pad Left/Right)
-        if (gamepad1.dpad_right && !lastDpadRight) {
+        if (controls.pollenVelocityUp) {
             intakeLauncher.adjustPollenLauncherVelocity(50.0)
         }
-        if (gamepad1.dpad_left && !lastDpadLeft) {
+        if (controls.pollenVelocityDown) {
             intakeLauncher.adjustPollenLauncherVelocity(-50.0)
         }
-        lastDpadRight = gamepad1.dpad_right
-        lastDpadLeft = gamepad1.dpad_left
 
         val nectarVel = robot.nectarLauncher?.velocity ?: 0.0
         val pollenVel = robot.pollenLauncher?.velocity ?: 0.0
@@ -97,7 +89,7 @@ class BioBuzzLauncherTeleop : OpMode() {
 
         // Telemetry
         telemetry.addData("--- BioBuzz Launcher Tuning ---", "")
-        telemetry.addData("Controls", "A: Spin Up, RT: Nectar Launcher, LT: Pollen Launcher, RB: Intake, LB: Reverse/Unjam")
+        telemetry.addData("Controls", "A/Y: Spin Up, RT: Nectar Launcher, LT: Pollen Launcher, RB: Intake, LB: Reverse/Unjam")
         telemetry.addData("Tuning", "D-Pad Up/Down: Nectar Launcher, D-Pad Left/Right: Pollen Launcher")
         telemetry.addData("Nectar Launcher Vel", "%.1f ticks/sec (Target: %.0f)", nectarVel, IntakeLauncherSubsystem.NECTAR_TARGET_VELOCITY)
         telemetry.addData("Pollen Launcher Vel", "%.1f ticks/sec (Target: %.0f)", pollenVel, IntakeLauncherSubsystem.POLLEN_TARGET_VELOCITY)
@@ -107,6 +99,7 @@ class BioBuzzLauncherTeleop : OpMode() {
     }
 
     override fun stop() {
+        pedroMecanum.stop()
         intakeLauncher.stop()
     }
 }
