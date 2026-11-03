@@ -5,6 +5,10 @@ import com.acmerobotics.dashboard.canvas.Canvas
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 import com.pedropathing.drivetrain.DrivePowers
+import com.pedropathing.ivy.Command
+import com.pedropathing.ivy.Scheduler
+import com.pedropathing.ivy.commands.Commands.*
+import com.pedropathing.ivy.groups.Groups.sequential
 import com.pedropathing.math.Vector2D
 import com.pedropathing.paths.Path
 import com.pedropathing.revhub.drivetrains.Mecanum
@@ -18,12 +22,13 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Autonomous OpMode for BioBuzz StarterBot using Pedro Pathing 3.0 & Pinpoint Odometry.
- * Consistent with RoadRunnerAutoOpMode:
- * - Executes launcher spin-up & 0.2s feeder pulse BEFORE path traversal
- * - Traverses all 4 field poses defined in PedroPaths (shooting, reloading, garden, opposite shooting)
- * - Uses Limelight 3A AprilTag targeting & approach at the shooting station
- * - Features closed-loop odometry & Pedro DrivePowers navigation
+ * Autonomous OpMode for BioBuzz StarterBot using Pedro Pathing 3.0, Pinpoint Odometry,
+ * and Pedro Pathing's Ivy Command Scheduler framework.
+ *
+ * Sequence:
+ * 1. Wait up to 5s for AprilTag lock
+ * 2. If AprilTag detected, spin up Nectar & Pollen launchers and feed elements for 5s
+ * 3. Follow path sequence: Shooting Position -> Reloading Start -> Load Garden -> Opposite Shooting Position
  */
 @Autonomous(name = "BioBuzz Autonomous (Pedro Pathing)", group = "Autonomous")
 class PedroAutoOpMode : LinearOpMode() {
@@ -43,8 +48,48 @@ class PedroAutoOpMode : LinearOpMode() {
     private val paths = PedroPaths()
     private var currentStep = "Initializing"
 
+    /**
+     * Builds the autonomous routine using Pedro Pathing's Ivy Command Scheduler.
+     */
+    private fun autoRoutine(): Command = sequential(
+        instant {
+            currentStep = "Waiting for AprilTag (up to 5s)"
+        },
+        waitMs(5000.0),
+        instant {
+            val tag = getAprilTagTarget()
+            if (tag != null && tag.isValid) {
+                currentStep = "AprilTag Detected! Launching for 5 seconds"
+                executeLaunchSequence(launchDurationMs = 5000L, requireAprilTag = false)
+            } else {
+                currentStep = "No AprilTag detected within 5s - Proceeding to paths"
+            }
+        },
+        instant {
+            currentStep = "1: Following Path -> Shooting Position (56.0, 36.0, 90°)"
+            followPedroPath(paths.startPath())
+        },
+        instant {
+            currentStep = "2: Following Path -> Reloading Start (34.80, 10.97, 90°)"
+            followPedroPath(paths.reloadingStartPath())
+        },
+        instant {
+            currentStep = "3: Following Path -> Load Garden (0.83, 14.19, 90°)"
+            followPedroPath(paths.loadGardenPath())
+        },
+        instant {
+            currentStep = "4: Following Path -> Opposite Shooting (52.82, 126.89, 270°)"
+            followPedroPath(paths.oppositeShootingPositionPath())
+        },
+        instant {
+            currentStep = "Complete! Holding final position"
+        }
+    )
+
     override fun runOpMode() {
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
+
+        Scheduler.reset()
 
         robot.initMecanumDrivetrain(hardwareMap)
         robot.initIntakeAndLauncher(hardwareMap)
@@ -105,60 +150,16 @@ class PedroAutoOpMode : LinearOpMode() {
         // Confirm start position at the moment START button is pressed
         odometry.resetPosition(startX, startY, startHeadingDeg)
 
-        // Wait up to 5 seconds to detect an AprilTag
-        currentStep = "Waiting for AprilTag (up to 5s)"
-        val tagWaitStart = System.currentTimeMillis()
-        var tagFound = false
-
-        while (opModeIsActive() && (System.currentTimeMillis() - tagWaitStart) < 5000) {
-            updatePoseAndTelemetry()
-            val tag = getAprilTagTarget()
-            if (tag != null && tag.isValid) {
-                tagFound = true
-                break
-            }
-            sleep(20)
-        }
-
-        // If seen, immediately spin launcher for 5 seconds (5000ms)
-        if (tagFound) {
-            currentStep = "AprilTag Detected! Launching for 5 seconds"
-            updatePoseAndTelemetry()
-            executeLaunchSequence(launchDurationMs = 5000L, requireAprilTag = false)
-        } else {
-            currentStep = "No AprilTag detected within 5s - Proceeding to paths"
-            updatePoseAndTelemetry()
-            sleep(200)
-        }
-
-        // Step 1: Follow Path to Shooting Position (56.0, 36.0) maintaining 90° heading
-        currentStep = "1: Following Path -> Shooting Position (56.0, 36.0, 90°)"
-        followPedroPath(paths.startPath())
-        sleep(250)
-
-        // Step 2: Follow Path to Reloading Start (34.80, 10.97) maintaining 90° heading
-        currentStep = "2: Following Path -> Reloading Start (34.80, 10.97, 90°)"
-        followPedroPath(paths.reloadingStartPath())
-        sleep(250)
-
-        // Step 3: Follow Path to Load Garden (0.83, 14.19) maintaining 90° heading
-        currentStep = "3: Following Path -> Load Garden (0.83, 14.19, 90°)"
-        followPedroPath(paths.loadGardenPath())
-        sleep(250)
-
-        // Step 4: Follow Path to Opposite Shooting Position (52.82, 126.89, rotating 90° -> 270°)
-        currentStep = "4: Following Path -> Opposite Shooting (52.82, 126.89, 270°)"
-        followPedroPath(paths.oppositeShootingPositionPath())
-        sleep(250)
-
-        currentStep = "Complete! Holding final position"
+        // Schedule autonomous sequence command via Ivy Scheduler
+        Scheduler.schedule(autoRoutine())
 
         while (opModeIsActive()) {
-            pedroMecanum.stop()
+            Scheduler.execute()
             updatePoseAndTelemetry()
-            sleep(20)
+            sleep(15)
         }
 
+        Scheduler.reset()
         pedroMecanum.stop()
     }
 
