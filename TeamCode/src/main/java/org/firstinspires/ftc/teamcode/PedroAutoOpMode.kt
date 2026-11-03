@@ -24,11 +24,6 @@ import kotlin.math.sqrt
 /**
  * Autonomous OpMode for BioBuzz StarterBot using Pedro Pathing 3.0, Pinpoint Odometry,
  * and Pedro Pathing's Ivy Command Scheduler framework.
- *
- * Sequence:
- * 1. Wait up to 5s for AprilTag lock
- * 2. If AprilTag detected, spin up Nectar & Pollen launchers and feed elements for 5s
- * 3. Follow path sequence: Shooting Position -> Reloading Start -> Load Garden -> Opposite Shooting Position
  */
 @Autonomous(name = "BioBuzz Autonomous (Pedro Pathing)", group = "Autonomous")
 class PedroAutoOpMode : LinearOpMode() {
@@ -49,42 +44,169 @@ class PedroAutoOpMode : LinearOpMode() {
     private var currentStep = "Initializing"
 
     /**
-     * Builds the autonomous routine using Pedro Pathing's Ivy Command Scheduler.
+     * Builds a non-blocking Ivy Command for trajectory path following.
      */
-    private fun autoRoutine(): Command = sequential(
-        instant {
-            currentStep = "Waiting for AprilTag (up to 5s)"
-        },
-        waitMs(5000.0),
-        instant {
-            val tag = getAprilTagTarget()
-            if (tag != null && tag.isValid) {
-                currentStep = "AprilTag Detected! Launching for 5 seconds"
-                executeLaunchSequence(launchDurationMs = 5000L, requireAprilTag = false)
-            } else {
-                currentStep = "No AprilTag detected within 5s - Proceeding to paths"
+    private fun followPathCommand(path: Path, stepLabel: String): Command {
+        val curve = path.curve
+        val finalTargetPose = path.endPose()
+        var currentT = 0.0
+        var isDone = false
+
+        return Command.build()
+            .setStart {
+                currentStep = stepLabel
+                currentT = 0.0
+                isDone = false
             }
-        },
-        instant {
-            currentStep = "1: Following Path -> Shooting Position (56.0, 36.0, 90°)"
-            followPedroPath(paths.startPath())
-        },
-        instant {
-            currentStep = "2: Following Path -> Reloading Start (34.80, 10.97, 90°)"
-            followPedroPath(paths.reloadingStartPath())
-        },
-        instant {
-            currentStep = "3: Following Path -> Load Garden (0.83, 14.19, 90°)"
-            followPedroPath(paths.loadGardenPath())
-        },
-        instant {
-            currentStep = "4: Following Path -> Opposite Shooting (52.82, 126.89, 270°)"
-            followPedroPath(paths.oppositeShootingPositionPath())
-        },
-        instant {
-            currentStep = "Complete! Holding final position"
-        }
-    )
+            .setExecute {
+                odometry.update(null)
+                val currentX = odometry.posX
+                val currentY = odometry.posY
+                val currentHeadingRad = Math.toRadians(odometry.heading)
+
+                val posVec = Vector2D.cartesian(currentX, currentY)
+                val measuredT = curve.closestParameter(posVec, currentT)
+                currentT = maxOf(currentT, measuredT.coerceIn(0.0, 1.0))
+
+                val curveLength = maxOf(curve.length(), 0.01)
+                val lookAheadT = (currentT + (12.0 / curveLength)).coerceIn(0.0, 1.0)
+                val targetVec = curve.get(lookAheadT)
+                val targetHeading = path.heading(lookAheadT)
+
+                val dx = targetVec.x() - currentX
+                val dy = targetVec.y() - currentY
+
+                val distToFinal = hypot(finalTargetPose.x() - currentX, finalTargetPose.y() - currentY)
+                var finalHeadingError = finalTargetPose.heading() - currentHeadingRad
+                while (finalHeadingError > Math.PI) finalHeadingError -= 2 * Math.PI
+                while (finalHeadingError < -Math.PI) finalHeadingError += 2 * Math.PI
+
+                var trackingHeadingError = targetHeading - currentHeadingRad
+                while (trackingHeadingError > Math.PI) trackingHeadingError -= 2 * Math.PI
+                while (trackingHeadingError < -Math.PI) trackingHeadingError += 2 * Math.PI
+
+                if (currentT >= 0.95 && distToFinal < 2.0 && abs(Math.toDegrees(finalHeadingError)) < 4.0) {
+                    pedroMecanum.stop()
+                    isDone = true
+                    return@setExecute
+                }
+
+                val fieldXCmd = (dx * 0.065).coerceIn(-0.65, 0.65)
+                val fieldYCmd = (dy * 0.065).coerceIn(-0.65, 0.65)
+                val turnPower = (trackingHeadingError * 0.7).coerceIn(-0.4, 0.4)
+
+                val cosH = cos(currentHeadingRad)
+                val sinH = sin(currentHeadingRad)
+
+                val robotForward = fieldXCmd * cosH + fieldYCmd * sinH
+                val robotStrafe = -fieldXCmd * sinH + fieldYCmd * cosH
+
+                pedroMecanum.drive(DrivePowers(robotForward, robotStrafe, turnPower), true)
+                updateAutoTelemetry(currentX, currentY, odometry.heading, activePath = path)
+            }
+            .setDone { isDone }
+            .setEnd {
+                pedroMecanum.stop()
+            }
+    }
+
+    /**
+     * Builds a non-blocking Ivy Command for launching game elements.
+     */
+    private fun executeLaunchCommand(launchDurationMs: Long): Command {
+        var startTimeMs = 0L
+        var flywheelsReady = false
+        var isDone = false
+
+        val minVel1 = IntakeLauncherSubsystem.MIN_VELOCITY
+        val minVel2 = IntakeLauncherSubsystem.LAUNCHER_2_MIN_VELOCITY
+
+        return Command.build()
+            .setStart {
+                currentStep = "AprilTag Detected! Launching for ${launchDurationMs / 1000} seconds"
+                startTimeMs = System.currentTimeMillis()
+                flywheelsReady = false
+                isDone = false
+                robot.launcher?.velocity = IntakeLauncherSubsystem.TARGET_VELOCITY
+                robot.launcher2?.velocity = IntakeLauncherSubsystem.LAUNCHER_2_TARGET_VELOCITY
+            }
+            .setExecute {
+                val now = System.currentTimeMillis()
+                val v1 = robot.launcher?.velocity ?: 0.0
+                val v2 = robot.launcher2?.velocity ?: 0.0
+
+                if (!flywheelsReady && ((v1 > minVel1 && v2 > minVel2) || (now - startTimeMs) > 800)) {
+                    flywheelsReady = true
+                }
+
+                if (flywheelsReady) {
+                    robot.leftLauncherServo?.power = 1.0
+                    robot.rightLauncherServo?.power = 1.0
+                    robot.intake?.power = 0.8
+                } else {
+                    robot.leftLauncherServo?.power = 0.0
+                    robot.rightLauncherServo?.power = 0.0
+                }
+
+                updatePoseAndTelemetry()
+
+                if (now - startTimeMs >= launchDurationMs) {
+                    isDone = true
+                }
+            }
+            .setDone { isDone }
+            .setEnd {
+                robot.launcher?.velocity = 0.0
+                robot.launcher2?.velocity = 0.0
+                robot.intake?.power = 0.0
+                robot.leftLauncherServo?.power = 0.0
+                robot.rightLauncherServo?.power = 0.0
+            }
+    }
+
+    /**
+     * Builds the complete autonomous routine sequence using Ivy Command Groups.
+     */
+    private fun autoRoutine(): Command {
+        var aprilTagFound = false
+        var tagWaitStart = 0L
+
+        return sequential(
+            // 1. Wait up to 5s for AprilTag
+            Command.build()
+                .setStart {
+                    currentStep = "Waiting for AprilTag (up to 5s)"
+                    tagWaitStart = System.currentTimeMillis()
+                    aprilTagFound = false
+                }
+                .setExecute {
+                    val tag = getAprilTagTarget()
+                    if (tag != null && tag.isValid) {
+                        aprilTagFound = true
+                    }
+                    updatePoseAndTelemetry()
+                }
+                .setDone { aprilTagFound || (System.currentTimeMillis() - tagWaitStart) >= 5000L },
+
+            // 2. Launch Sequence if AprilTag was detected
+            conditional(
+                { aprilTagFound },
+                executeLaunchCommand(5000L),
+                instant { currentStep = "No AprilTag detected within 5s - Proceeding to paths" }
+            ),
+
+            // 3. Traversal Sequence
+            followPathCommand(paths.startPath(), "1: Following Path -> Shooting Position (56.0, 36.0, 90°)"),
+            followPathCommand(paths.reloadingStartPath(), "2: Following Path -> Reloading Start (34.80, 10.97, 90°)"),
+            followPathCommand(paths.loadGardenPath(), "3: Following Path -> Load Garden (0.83, 14.19, 90°)"),
+            followPathCommand(paths.oppositeShootingPositionPath(), "4: Following Path -> Opposite Shooting (52.82, 126.89, 270°)"),
+
+            instant {
+                currentStep = "Complete! Holding final position"
+                pedroMecanum.stop()
+            }
+        )
+    }
 
     override fun runOpMode() {
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
@@ -150,137 +272,16 @@ class PedroAutoOpMode : LinearOpMode() {
         // Confirm start position at the moment START button is pressed
         odometry.resetPosition(startX, startY, startHeadingDeg)
 
-        // Schedule autonomous sequence command via Ivy Scheduler
+        // Schedule autonomous routine using Ivy Command Scheduler
         Scheduler.schedule(autoRoutine())
 
-        while (opModeIsActive()) {
+        while (opModeIsActive() && !isStopRequested) {
             Scheduler.execute()
-            updatePoseAndTelemetry()
             sleep(15)
         }
 
         Scheduler.reset()
         pedroMecanum.stop()
-    }
-
-    /**
-     * Follows a Pedro Path smoothly using Pedro DrivePowers kinematics and odometry feedback.
-     * Uses look-ahead along the actual path curve so curved trajectories are tracked precisely
-     * instead of driving straight into obstacles.
-     */
-    private fun followPedroPath(path: Path, timeoutSec: Double = 8.0) {
-        val curve = path.curve
-        val finalTargetPose = path.endPose()
-        val startTime = System.currentTimeMillis()
-        var currentT = 0.0
-
-        while (opModeIsActive() && (System.currentTimeMillis() - startTime) < (timeoutSec * 1000)) {
-            odometry.update(null)
-            val currentX = odometry.posX
-            val currentY = odometry.posY
-            val currentHeadingRad = Math.toRadians(odometry.heading)
-
-            // Find closest t-parameter on curve for current robot position (advancing forward only)
-            val posVec = Vector2D.cartesian(currentX, currentY)
-            val measuredT = curve.closestParameter(posVec, currentT)
-            currentT = maxOf(currentT, measuredT.coerceIn(0.0, 1.0))
-
-            // Look-ahead along curve (look-ahead distance ~12 inches)
-            val curveLength = maxOf(curve.length(), 0.01)
-            val lookAheadT = (currentT + (12.0 / curveLength)).coerceIn(0.0, 1.0)
-            val targetVec = curve.get(lookAheadT)
-            val targetHeading = path.heading(lookAheadT)
-
-            val dx = targetVec.x() - currentX
-            val dy = targetVec.y() - currentY
-
-            // Distance and heading error to final endpoint for completion check
-            val distToFinal = hypot(finalTargetPose.x() - currentX, finalTargetPose.y() - currentY)
-            var finalHeadingError = finalTargetPose.heading() - currentHeadingRad
-            while (finalHeadingError > Math.PI) finalHeadingError -= 2 * Math.PI
-            while (finalHeadingError < -Math.PI) finalHeadingError += 2 * Math.PI
-
-            var trackingHeadingError = targetHeading - currentHeadingRad
-            while (trackingHeadingError > Math.PI) trackingHeadingError -= 2 * Math.PI
-            while (trackingHeadingError < -Math.PI) trackingHeadingError += 2 * Math.PI
-
-            updatePoseAndTelemetry(path)
-
-            if (currentT >= 0.95 && distToFinal < 2.0 && abs(Math.toDegrees(finalHeadingError)) < 4.0) {
-                break
-            }
-
-            // Proportional feedback toward look-ahead target in field frame
-            val fieldXCmd = (dx * 0.065).coerceIn(-0.65, 0.65)
-            val fieldYCmd = (dy * 0.065).coerceIn(-0.65, 0.65)
-            val turnPower = (trackingHeadingError * 0.7).coerceIn(-0.4, 0.4)
-
-            // Convert field-frame vector to robot-frame vector given current robot heading
-            val cosH = cos(currentHeadingRad)
-            val sinH = sin(currentHeadingRad)
-
-            val robotForward = fieldXCmd * cosH + fieldYCmd * sinH
-            val robotStrafe = -fieldXCmd * sinH + fieldYCmd * cosH
-
-            pedroMecanum.drive(DrivePowers(robotForward, robotStrafe, turnPower), true)
-            sleep(15)
-        }
-
-        pedroMecanum.stop()
-    }
-
-    /**
-     * Spins up the launcher flywheels and feeds elements via left servos once target speed is reached.
-     * Enforces AprilTag visibility check so launcher will NOT fire if no AprilTag is detected.
-     */
-    private fun executeLaunchSequence(launchDurationMs: Long = 2500, requireAprilTag: Boolean = true) {
-        if (requireAprilTag) {
-            val tag = getAprilTagTarget()
-            if (tag == null || !tag.isValid) {
-                currentStep = "Launch Aborted: No AprilTag Detected!"
-                updatePoseAndTelemetry()
-                sleep(500)
-                return
-            }
-        }
-
-        val targetVel1 = IntakeLauncherSubsystem.TARGET_VELOCITY
-        val minVel1 = IntakeLauncherSubsystem.MIN_VELOCITY
-        val targetVel2 = IntakeLauncherSubsystem.LAUNCHER_2_TARGET_VELOCITY
-        val minVel2 = IntakeLauncherSubsystem.LAUNCHER_2_MIN_VELOCITY
-
-        robot.launcher?.velocity = targetVel1
-        robot.launcher2?.velocity = targetVel2
-
-        val startTime = System.currentTimeMillis()
-        var flywheelsReady = false
-
-        while (opModeIsActive() && (System.currentTimeMillis() - startTime) < launchDurationMs) {
-            val v1 = robot.launcher?.velocity ?: 0.0
-            val v2 = robot.launcher2?.velocity ?: 0.0
-
-            if (!flywheelsReady && ((v1 > minVel1 && v2 > minVel2) || (System.currentTimeMillis() - startTime) > 800)) {
-                flywheelsReady = true
-            }
-
-            if (flywheelsReady) {
-                robot.leftLauncherServo?.power = 1.0
-                robot.rightLauncherServo?.power = 1.0
-                robot.intake?.power = 0.8
-            } else {
-                robot.leftLauncherServo?.power = 0.0
-                robot.rightLauncherServo?.power = 0.0
-            }
-
-            updatePoseAndTelemetry()
-            sleep(20)
-        }
-
-        robot.launcher?.velocity = 0.0
-        robot.launcher2?.velocity = 0.0
-        robot.intake?.power = 0.0
-        robot.leftLauncherServo?.power = 0.0
-        robot.rightLauncherServo?.power = 0.0
     }
 
     data class AprilTagTarget(
@@ -452,9 +453,6 @@ class PedroAutoOpMode : LinearOpMode() {
     }
 
     private fun drawBioBuzzFieldOverlay(fieldOverlay: Canvas, robotX: Double, robotY: Double, headingDeg: Double, activePath: Path? = null) {
-        // Draw Field Background Image (144" x 144") directly from /dash/field.png asset
-        fieldOverlay.drawImage("/dash/field.png", 0.0, 0.0, 144.0, 144.0)
-
         // Field Outer Perimeter (144" x 144")
         fieldOverlay.setStroke("#52525B")
         fieldOverlay.setStrokeWidth(1)

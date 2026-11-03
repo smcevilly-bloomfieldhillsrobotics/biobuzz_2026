@@ -64,11 +64,20 @@ class BioBuzzMecanumTeleop : OpMode() {
 
         // Driver 1: Holonomic Drive Powers (Field-Relative or Robot-Centric)
         val powers = controls.drivePowers
+        val fwdCmd = powers.forward()
+        val strCmd = powers.strafe()
+        val rotCmd = powers.turn()
+
         if (fieldCentric) {
             val headingRad = Math.toRadians(odometry.heading)
-            val rotX = (powers.strafe() * cos(-headingRad)) - (powers.forward() * sin(-headingRad))
-            val rotY = (powers.strafe() * sin(-headingRad)) + (powers.forward() * cos(-headingRad))
-            pedroMecanum.drive(DrivePowers(rotY, rotX, powers.turn()), true)
+            val cosH = cos(headingRad)
+            val sinH = sin(headingRad)
+
+            // Convert Field-Frame vector (fwdCmd, strCmd) to Robot-Frame vector
+            val robotFwd = fwdCmd * cosH + strCmd * sinH
+            val robotStr = -fwdCmd * sinH + strCmd * cosH
+
+            pedroMecanum.drive(DrivePowers(robotFwd, robotStr, rotCmd), true)
         } else {
             pedroMecanum.drive(powers, true)
         }

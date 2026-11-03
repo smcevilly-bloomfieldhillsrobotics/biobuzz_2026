@@ -41,8 +41,6 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 class RobotHardware {
 
     companion object {
-        val LEFT_DRIVE_NAMES = arrayOf("left_drive", "leftDrive", "motor0")
-        val RIGHT_DRIVE_NAMES = arrayOf("right_drive", "rightDrive", "motor1")
         val FRONT_LEFT_DRIVE_NAMES = arrayOf("front_left_drive", "leftFront", "frontLeft", "motor0")
         val FRONT_RIGHT_DRIVE_NAMES = arrayOf("front_right_drive", "rightFront", "frontRight", "motor1")
         val BACK_LEFT_DRIVE_NAMES = arrayOf("back_left_drive", "leftRear", "backLeft", "motor2")
@@ -59,8 +57,6 @@ class RobotHardware {
         val PINPOINT_NAMES = arrayOf("pinpoint", "odometry", "pinpoint_odom")
     }
 
-    var leftDrive: DcMotor? = null
-    var rightDrive: DcMotor? = null
     var frontLeftDrive: DcMotor? = null
     var frontRightDrive: DcMotor? = null
     var backLeftDrive: DcMotor? = null
@@ -87,24 +83,10 @@ class RobotHardware {
     }
 
     fun initAll(hardwareMap: HardwareMap) {
-        initDrivetrain(hardwareMap)
+        initMecanumDrivetrain(hardwareMap)
         initIntakeAndLauncher(hardwareMap)
         initLimelight(hardwareMap)
         initPinpoint(hardwareMap)
-    }
-
-    fun initDrivetrain(hardwareMap: HardwareMap) {
-        leftDrive = tryGetMotor(hardwareMap, *LEFT_DRIVE_NAMES)?.apply {
-            direction = DcMotorSimple.Direction.FORWARD
-            zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
-            mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
-        }
-
-        rightDrive = tryGetMotor(hardwareMap, *RIGHT_DRIVE_NAMES)?.apply {
-            direction = DcMotorSimple.Direction.REVERSE
-            zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
-            mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
-        }
     }
 
     fun initMecanumDrivetrain(hardwareMap: HardwareMap) {

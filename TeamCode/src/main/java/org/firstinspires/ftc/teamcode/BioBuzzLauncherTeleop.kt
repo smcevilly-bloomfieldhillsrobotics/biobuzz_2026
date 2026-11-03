@@ -3,18 +3,21 @@ package org.firstinspires.ftc.teamcode
 import com.acmerobotics.dashboard.FtcDashboard
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
+import com.pedropathing.drivetrain.DrivePowers
+import com.pedropathing.revhub.drivetrains.Mecanum
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
+import kotlin.math.abs
 
 /**
- * A dedicated TeleOp mode focused exclusively on the Intake, Nectar Launcher, and Pollen Launcher subsystems.
- * This can be useful for tuning launcher velocity or diagnosing intake jams without 
- * engaging the drivetrain or odometry systems.
+ * A dedicated TeleOp mode focused exclusively on the Intake, Nectar Launcher, and Pollen Launcher subsystems
+ * with full driving capability.
  */
 @TeleOp(name = "BioBuzz Launcher Tuning", group = "Test")
 class BioBuzzLauncherTeleop : OpMode() {
 
     private val robot = RobotHardware()
+    private lateinit var pedroMecanum: Mecanum
     private lateinit var intakeLauncher: IntakeLauncherSubsystem
     
     // State tracking for edge-detection on D-Pad buttons
@@ -26,15 +29,27 @@ class BioBuzzLauncherTeleop : OpMode() {
     override fun init() {
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
 
-        // Only initialize required hardware for intake and launcher
+        robot.initMecanumDrivetrain(hardwareMap)
         robot.initIntakeAndLauncher(hardwareMap)
+
+        pedroMecanum = robot.createPedroMecanum(hardwareMap)
         intakeLauncher = IntakeLauncherSubsystem(robot)
 
-        telemetry.addData("Status", "Launcher Subsystem Ready")
+        telemetry.addData("Status", "Launcher Subsystem & Drivetrain Ready")
         telemetry.update()
     }
 
     override fun loop() {
+        // Driver 1: Drive controls
+        val forward = -gamepad1.left_stick_y.toDouble()
+        val strafe = -gamepad1.left_stick_x.toDouble()
+        val rotate = -gamepad1.right_stick_x.toDouble()
+
+        if (abs(forward) > 0.05 || abs(strafe) > 0.05 || abs(rotate) > 0.05) {
+            pedroMecanum.drive(DrivePowers(forward, strafe, rotate), true)
+        } else {
+            pedroMecanum.stop()
+        }
         // Driver 1: Controls Intake and Launchers (for standalone testing)
         // Button A: Spin up Nectar & Pollen launchers to target velocity
         // Right Trigger: Feed Nectar Launcher (Right)

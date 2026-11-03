@@ -92,7 +92,7 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
         rightBumper: Boolean,
         leftBumper: Boolean
     ) {
-        // 1. Launchers Spin Up via Button A
+        // 1. Launchers Spin Up strictly via Button A
         if (spinUpLaunchers) {
             robot.nectarLauncher?.velocity = NECTAR_TARGET_VELOCITY
             robot.pollenLauncher?.velocity = POLLEN_TARGET_VELOCITY
@@ -120,9 +120,9 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
         // 3. Nectar Launcher (Right) Trigger Edge Detection & 200ms Pulse
         if (nectarTrigger <= 0.05f) {
             nectarTriggerReleased = true
-        } else if (nectarTrigger > 0.1f && nectarTriggerReleased) {
-            nectarTriggerReleased = false
-            if (nectarAtSpeed) {
+        } else if (nectarTrigger > 0.1f) {
+            if (nectarAtSpeed && nectarTriggerReleased) {
+                nectarTriggerReleased = false
                 nectarServoEndTimeMs = currentTimeMs + SERVO_PULSE_DURATION_MS
             }
         }
@@ -130,9 +130,9 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) {
         // 4. Pollen Launcher (Left) Trigger Edge Detection & 200ms Pulse
         if (pollenTrigger <= 0.05f) {
             pollenTriggerReleased = true
-        } else if (pollenTrigger > 0.1f && pollenTriggerReleased) {
-            pollenTriggerReleased = false
-            if (pollenAtSpeed) {
+        } else if (pollenTrigger > 0.1f) {
+            if (pollenAtSpeed && pollenTriggerReleased) {
+                pollenTriggerReleased = false
                 pollenServoEndTimeMs = currentTimeMs + SERVO_PULSE_DURATION_MS
             }
         }
