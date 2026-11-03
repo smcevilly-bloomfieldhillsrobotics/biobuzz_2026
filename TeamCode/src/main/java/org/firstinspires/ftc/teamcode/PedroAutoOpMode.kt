@@ -2,9 +2,13 @@ package org.firstinspires.ftc.teamcode
 
 import com.acmerobotics.dashboard.FtcDashboard
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket
+import com.pedropathing.algorithm.Algorithm
 import com.pedropathing.api.Paths.curve
 import com.pedropathing.api.Paths.line
 import com.pedropathing.api.PoseFactory
+import com.pedropathing.drivetrain.DrivePowers
+import com.pedropathing.drivetrain.Drivetrain
 import com.pedropathing.follower.Follower
 import com.pedropathing.ivy.Command
 import com.pedropathing.ivy.Scheduler
@@ -13,14 +17,18 @@ import com.pedropathing.ivy.behaviors.EndCondition
 import com.pedropathing.ivy.commands.Commands.conditional
 import com.pedropathing.ivy.commands.Commands.instant
 import com.pedropathing.ivy.groups.Groups.sequential
+import com.pedropathing.localization.MotionState
 import com.pedropathing.math.Pose
+import com.pedropathing.math.Vector2D
 import com.pedropathing.paths.Path
+import com.pedropathing.paths.PathTracker
 import com.pedropathing.revhub.localizers.PinpointConfig
 import com.pedropathing.revhub.localizers.PinpointLocalizer
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
+import java.util.OptionalDouble
 
 /**
  * Autonomous OpMode for BioBuzz StarterBot using Pedro Pathing 3.0, native PinpointLocalizer,
@@ -50,17 +58,17 @@ class PedroAutoOpMode : OpMode() {
                 }
             }
 
-    // Poses
+    // Poses (Adjusted with 9" robot radius clearance from X=0 wall)
     private val startPose: Pose = poseFactory.of(56.0, 8.0, 90.0)
     private val shootingPose: Pose = poseFactory.of(56.0, 36.0, 90.0)
     private val reloadingStartPose: Pose = poseFactory.of(34.8, 11.0, 90.0)
-    private val loadGardenPose: Pose = poseFactory.of(0.8, 14.2, 90.0)
+    private val loadGardenPose: Pose = poseFactory.of(11.0, 14.2, 90.0) // X=11.0 leaves 2" clearance from X=0 wall
     private val oppositeShootingPose: Pose = poseFactory.of(52.8, 126.9, 270.0)
 
     // Control Points
     private val reloadingControl: Pose = poseFactory.of(56.0, 20.0, 90.0)
-    private val gardenControl: Pose = poseFactory.of(17.8, 12.6, 90.0)
-    private val oppositeShootingControl: Pose = poseFactory.of(10.0, 85.0, 90.0)
+    private val gardenControl: Pose = poseFactory.of(18.0, 12.6, 90.0)
+    private val oppositeShootingControl: Pose = poseFactory.of(18.0, 85.0, 90.0) // X=18.0 leaves 9" safe clearance from X=0 wall
 
     // Path methods
     private fun startToShooting(): Path =
@@ -178,14 +186,18 @@ class PedroAutoOpMode : OpMode() {
         val pedroMecanum = robot.createPedroMecanum(hardwareMap)
         val pinpointLocalizer = PinpointLocalizer(hardwareMap, PinpointConfig { c ->
             c.name.set(PedroConstants.PINPOINT_DEVICE_NAME)
-            c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.REVERSED)
-            c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD)
+            c.xPodDirection.set(PedroConstants.X_POD_DIRECTION)
+            c.yPodDirection.set(PedroConstants.Y_POD_DIRECTION)
             c.xPodOffset.set(PedroConstants.X_POD_OFFSET_MM)
             c.yPodOffset.set(PedroConstants.Y_POD_OFFSET_MM)
             c.offsetUnits.set(DistanceUnit.MM)
+            if (PedroConstants.USE_CUSTOM_TICKS_PER_INCH) {
+                c.ticksPerUnit.set(OptionalDouble.of(PedroConstants.CUSTOM_TICKS_PER_INCH))
+                c.encoderResolutionUnit.set(DistanceUnit.INCH)
+            }
         })
 
-        follower = Follower(pinpointLocalizer, pedroMecanum, null)
+        follower = Follower(pinpointLocalizer, pedroMecanum, PedroAlgorithm())
         follower.setPose(startPose)
 
         telemetry.addData("Status", "Pedro Pathing Autonomous Initialized")
@@ -201,6 +213,30 @@ class PedroAutoOpMode : OpMode() {
         Scheduler.execute()
 
         val pose = follower.pose()
+
+        val packet = TelemetryPacket()
+        packet.put("Step", currentStep)
+        packet.put("X", pose.x())
+        packet.put("Y", pose.y())
+        packet.put("Heading (deg)", Math.toDegrees(pose.heading()))
+
+        // Draw Pedro Pathing Robot Overlay on FTC Dashboard Canvas
+        val fieldOverlay = packet.fieldOverlay()
+        fieldOverlay.setStroke("#22C55E")
+        fieldOverlay.setStrokeWidth(2)
+        fieldOverlay.strokeCircle(pose.x(), pose.y(), 9.0)
+
+        val headingRad = pose.heading()
+        val length = 12.0
+        fieldOverlay.strokeLine(
+            pose.x(),
+            pose.y(),
+            pose.x() + length * Math.cos(headingRad),
+            pose.y() + length * Math.sin(headingRad)
+        )
+
+        FtcDashboard.getInstance().sendTelemetryPacket(packet)
+
         telemetry.addData("--- Pedro Autonomous Status ---", "")
         telemetry.addData("Step", currentStep)
         telemetry.addData("X", pose.x())
@@ -251,4 +287,67 @@ class PedroAutoOpMode : OpMode() {
 
         return bestTag
     }
+}
+
+class PedroAlgorithm : Algorithm {
+    private var isBusy = false
+    private var currentPose = Pose.zero()
+
+    override fun reset() {
+        isBusy = true
+    }
+
+    override fun isBusy(): Boolean = isBusy
+
+    override fun calculatePath(
+        drivetrain: Drivetrain,
+        pathTracker: PathTracker,
+        motionState: MotionState,
+        dt: Double
+    ): DrivePowers {
+        val robotPose = motionState.pose()
+        currentPose = robotPose
+
+        val endPose = pathTracker.endPose()
+        val dx = endPose.x() - robotPose.x()
+        val dy = endPose.y() - robotPose.y()
+        var headingError = endPose.heading() - robotPose.heading()
+        while (headingError > Math.PI) headingError -= 2 * Math.PI
+        while (headingError < -Math.PI) headingError += 2 * Math.PI
+
+        if (Math.hypot(dx, dy) < 2.0 && Math.abs(Math.toDegrees(headingError)) < 4.0) {
+            isBusy = false
+            return DrivePowers.zero()
+        }
+
+        val cosH = Math.cos(robotPose.heading())
+        val sinH = Math.sin(robotPose.heading())
+
+        val fwdCmd = (dx * cosH + dy * sinH) * PedroConstants.TRANSLATIONAL_P
+        val strCmd = (-dx * sinH + dy * cosH) * PedroConstants.TRANSLATIONAL_P
+        val turnCmd = headingError * PedroConstants.HEADING_P
+
+        return DrivePowers(
+            fwdCmd.coerceIn(-PedroConstants.MAX_AUTO_POWER, PedroConstants.MAX_AUTO_POWER),
+            strCmd.coerceIn(-PedroConstants.MAX_AUTO_POWER, PedroConstants.MAX_AUTO_POWER),
+            turnCmd.coerceIn(-0.4, 0.4)
+        )
+    }
+
+    override fun calculateHold(
+        drivetrain: Drivetrain,
+        targetPose: Pose,
+        motionState: MotionState,
+        useHoldScaling: Boolean,
+        dt: Double
+    ): DrivePowers = DrivePowers.zero()
+
+    override fun completion(): Double = 1.0
+    override fun closestPose(): Pose = currentPose
+    override fun closestTangent(): Vector2D = Vector2D.zero()
+    override fun closestNormal(): Vector2D = Vector2D.zero()
+    override fun curvature(): Double = 0.0
+    override fun remainingDistance(): Double = 0.0
+    override fun atParametricEnd(): Boolean = true
+    override fun debug(): Map<String, Any> = emptyMap()
 }

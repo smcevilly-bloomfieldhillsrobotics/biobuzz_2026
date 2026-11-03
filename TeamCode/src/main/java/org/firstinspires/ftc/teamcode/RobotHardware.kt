@@ -198,10 +198,14 @@ class RobotHardware {
             try {
                 pinpoint = hardwareMap[GoBildaPinpointDriver::class.java, name]?.apply {
                     setOffsets(PedroConstants.X_POD_OFFSET_MM, PedroConstants.Y_POD_OFFSET_MM, DistanceUnit.MM)
-                    setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
+                    if (PedroConstants.USE_CUSTOM_TICKS_PER_INCH) {
+                        setEncoderResolution(PedroConstants.CUSTOM_TICKS_PER_INCH, DistanceUnit.INCH)
+                    } else {
+                        setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD)
+                    }
                     setEncoderDirections(
-                        GoBildaPinpointDriver.EncoderDirection.REVERSED,
-                        GoBildaPinpointDriver.EncoderDirection.FORWARD,
+                        PedroConstants.X_POD_DIRECTION,
+                        PedroConstants.Y_POD_DIRECTION,
                     )
                     recalibrateIMU()
                 }
