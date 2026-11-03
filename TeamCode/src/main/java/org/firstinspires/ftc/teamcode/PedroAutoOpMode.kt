@@ -3,7 +3,6 @@ package org.firstinspires.ftc.teamcode
 import com.acmerobotics.dashboard.FtcDashboard
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
-import com.pedropathing.algorithm.Algorithm
 import com.pedropathing.api.Paths.curve
 import com.pedropathing.api.Paths.line
 import com.pedropathing.api.PoseFactory
@@ -198,6 +197,31 @@ class PedroAutoOpMode : OpMode() {
         })
 
         follower = Follower(pinpointLocalizer, pedroMecanum, PedroAlgorithm())
+            .withLogger { log ->
+                val pose = follower.pose()
+                val packet = TelemetryPacket()
+                packet.put("Step", currentStep)
+                packet.put("X", pose.x())
+                packet.put("Y", pose.y())
+                packet.put("Heading (deg)", Math.toDegrees(pose.heading()))
+
+                // Draw Pedro 3.0 Robot Overlay on FTC Dashboard & Panels
+                val fieldOverlay = packet.fieldOverlay()
+                fieldOverlay.setStroke("#22C55E")
+                fieldOverlay.setStrokeWidth(2)
+                fieldOverlay.strokeCircle(pose.x(), pose.y(), 9.0)
+
+                val headingRad = pose.heading()
+                val length = 12.0
+                fieldOverlay.strokeLine(
+                    pose.x(),
+                    pose.y(),
+                    pose.x() + length * Math.cos(headingRad),
+                    pose.y() + length * Math.sin(headingRad)
+                )
+
+                FtcDashboard.getInstance().sendTelemetryPacket(packet)
+            }
         follower.setPose(startPose)
 
         telemetry.addData("Status", "Pedro Pathing Autonomous Initialized")
@@ -213,30 +237,6 @@ class PedroAutoOpMode : OpMode() {
         Scheduler.execute()
 
         val pose = follower.pose()
-
-        val packet = TelemetryPacket()
-        packet.put("Step", currentStep)
-        packet.put("X", pose.x())
-        packet.put("Y", pose.y())
-        packet.put("Heading (deg)", Math.toDegrees(pose.heading()))
-
-        // Draw Pedro Pathing Robot Overlay on FTC Dashboard Canvas
-        val fieldOverlay = packet.fieldOverlay()
-        fieldOverlay.setStroke("#22C55E")
-        fieldOverlay.setStrokeWidth(2)
-        fieldOverlay.strokeCircle(pose.x(), pose.y(), 9.0)
-
-        val headingRad = pose.heading()
-        val length = 12.0
-        fieldOverlay.strokeLine(
-            pose.x(),
-            pose.y(),
-            pose.x() + length * Math.cos(headingRad),
-            pose.y() + length * Math.sin(headingRad)
-        )
-
-        FtcDashboard.getInstance().sendTelemetryPacket(packet)
-
         telemetry.addData("--- Pedro Autonomous Status ---", "")
         telemetry.addData("Step", currentStep)
         telemetry.addData("X", pose.x())
@@ -287,67 +287,4 @@ class PedroAutoOpMode : OpMode() {
 
         return bestTag
     }
-}
-
-class PedroAlgorithm : Algorithm {
-    private var isBusy = false
-    private var currentPose = Pose.zero()
-
-    override fun reset() {
-        isBusy = true
-    }
-
-    override fun isBusy(): Boolean = isBusy
-
-    override fun calculatePath(
-        drivetrain: Drivetrain,
-        pathTracker: PathTracker,
-        motionState: MotionState,
-        dt: Double
-    ): DrivePowers {
-        val robotPose = motionState.pose()
-        currentPose = robotPose
-
-        val endPose = pathTracker.endPose()
-        val dx = endPose.x() - robotPose.x()
-        val dy = endPose.y() - robotPose.y()
-        var headingError = endPose.heading() - robotPose.heading()
-        while (headingError > Math.PI) headingError -= 2 * Math.PI
-        while (headingError < -Math.PI) headingError += 2 * Math.PI
-
-        if (Math.hypot(dx, dy) < 2.0 && Math.abs(Math.toDegrees(headingError)) < 4.0) {
-            isBusy = false
-            return DrivePowers.zero()
-        }
-
-        val cosH = Math.cos(robotPose.heading())
-        val sinH = Math.sin(robotPose.heading())
-
-        val fwdCmd = (dx * cosH + dy * sinH) * PedroConstants.TRANSLATIONAL_P
-        val strCmd = (-dx * sinH + dy * cosH) * PedroConstants.TRANSLATIONAL_P
-        val turnCmd = headingError * PedroConstants.HEADING_P
-
-        return DrivePowers(
-            fwdCmd.coerceIn(-PedroConstants.MAX_AUTO_POWER, PedroConstants.MAX_AUTO_POWER),
-            strCmd.coerceIn(-PedroConstants.MAX_AUTO_POWER, PedroConstants.MAX_AUTO_POWER),
-            turnCmd.coerceIn(-0.4, 0.4)
-        )
-    }
-
-    override fun calculateHold(
-        drivetrain: Drivetrain,
-        targetPose: Pose,
-        motionState: MotionState,
-        useHoldScaling: Boolean,
-        dt: Double
-    ): DrivePowers = DrivePowers.zero()
-
-    override fun completion(): Double = 1.0
-    override fun closestPose(): Pose = currentPose
-    override fun closestTangent(): Vector2D = Vector2D.zero()
-    override fun closestNormal(): Vector2D = Vector2D.zero()
-    override fun curvature(): Double = 0.0
-    override fun remainingDistance(): Double = 0.0
-    override fun atParametricEnd(): Boolean = true
-    override fun debug(): Map<String, Any> = emptyMap()
 }
