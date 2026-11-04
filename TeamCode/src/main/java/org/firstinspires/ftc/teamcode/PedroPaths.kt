@@ -57,5 +57,20 @@ class PedroPaths {
         oppositeShootingPositionPathControl1,
         oppositeShootingPositionPose
     ).linear(Math.toRadians(90.0), Math.toRadians(270.0))
+
+    // AprilTag and Center Hive Auto Poses
+    val centerHiveStartPose: Pose = poseFactory.of(72.0, 9.0, 90.0)
+    val centerHiveIntermediatePose: Pose = poseFactory.of(72.0, 120.0, 90.0)
+    val centerHiveFinalPose: Pose = poseFactory.of(53.0, 120.0, 270.0)
+
+    val centerHiveIntermediatePath: Path get() = Paths.line(centerHiveStartPose, centerHiveIntermediatePose).constant(Math.toRadians(90.0))
+    val centerHiveFinalPath: Path get() = Paths.line(centerHiveIntermediatePose, centerHiveFinalPose).linear(Math.toRadians(90.0), Math.toRadians(270.0))
+
+    val aprilTagStartPose: Pose = poseFactory.of(72.0, 9.0, 90.0)
+    val aprilTagIntermediatePose: Pose = poseFactory.of(72.0, 110.0, 90.0)
+    val aprilTagFinalPose: Pose = poseFactory.of(53.0, 110.0, 270.0)
+
+    val aprilTagIntermediatePath: Path get() = Paths.line(aprilTagStartPose, aprilTagIntermediatePose).constant(Math.toRadians(90.0))
+    val aprilTagFinalPath: Path get() = Paths.line(aprilTagIntermediatePose, aprilTagFinalPose).linear(Math.toRadians(90.0), Math.toRadians(270.0))
 }
 

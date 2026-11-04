@@ -102,8 +102,11 @@ class BioBuzzLauncherTeleop : NextOpMode() {
         telemetry.update()
     }
 
-    override fun stop() {
-        pedroMecanum.stop()
-        intakeLauncher.stop()
-    }
+    // We can't override stop() in LinearOpMode, so we shouldn't use it here.
+    // Cleanup is handled by the NextOpMode when runOpMode finishes, or we could override onStop() if NextOpMode had one.
+    // Instead we can just do this when opmode is no longer active in runOpMode if it was manually overridden,
+    // but NextOpMode handles registered subsystems stop for us.
+    // But since pedroMecanum isn't a registered subsystem in this class, we should register it or handle it.
+    // Since NextOpMode doesn't provide an onStop, and LinearOpMode.stop() is final, we must remove it.
+
 }

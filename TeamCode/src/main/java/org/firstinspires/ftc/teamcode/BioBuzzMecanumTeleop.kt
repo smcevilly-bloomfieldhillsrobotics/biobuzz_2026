@@ -116,9 +116,6 @@ class BioBuzzMecanumTeleop : NextOpMode() {
 
 
 
-    override fun stop() {
-        pedroMecanum.stop()
-        intakeLauncher.stop()
-        aimingSubsystem.stop()
-    }
+    // We cannot override stop in NextOpMode because LinearOpMode stop is final
+
 }

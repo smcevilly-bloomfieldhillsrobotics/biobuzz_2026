@@ -92,6 +92,78 @@ class TelemetrySubsystem(telemetry: Telemetry) {
         telemetry.addData("Heading (deg)", "%.2f", odometry.heading)
         telemetry.update()
     }
+
+    fun publishAutoData(
+        opModeName: String,
+        currentStep: String,
+        intakeLauncher: IntakeLauncherSubsystem,
+        poseX: Double,
+        poseY: Double,
+        headingDeg: Double,
+        aprilTag: LimelightAimingSubsystem.AprilTagTarget?,
+        aprilTagFound: Boolean,
+        nectarLauncherVel: Double,
+        pollenLauncherVel: Double
+    ) {
+        val packet = TelemetryPacket()
+        packet.put("Step", currentStep)
+        packet.put("X", poseX)
+        packet.put("Y", poseY)
+        packet.put("Heading (deg)", headingDeg)
+        packet.put("AprilTag Found", aprilTagFound)
+        packet.put("Nectar Launcher Vel", nectarLauncherVel)
+        packet.put("Pollen Launcher Vel", pollenLauncherVel)
+        packet.put("Intake Power", intakeLauncher.intakePower)
+
+        if (aprilTag != null && aprilTag.isValid) {
+            packet.put("AprilTag ID", aprilTag.id)
+            packet.put("AprilTag Distance (in)", aprilTag.distanceInches)
+            packet.put("AprilTag Offset (°)", aprilTag.txDegrees)
+        }
+
+        val fieldOverlay = packet.fieldOverlay()
+        fieldOverlay.setStroke("#F59E0B")
+        fieldOverlay.setStrokeWidth(2)
+        
+        // FTC Dashboard coordinates: (0,0) is center, +X goes UP, +Y goes LEFT
+        // Pedro Pathing coordinates: (0,0) is bottom-left, +X goes UP, +Y goes RIGHT
+        // We need to map Pedro (X, Y) to FTC Dashboard (-Y + 72, X - 72)
+        val drawX = poseX - 72.0
+        val drawY = 72.0 - poseY
+        val drawHeading = Math.toRadians(headingDeg) - Math.PI / 2.0 
+
+        fieldOverlay.strokeCircle(drawX, drawY, 9.0)
+        
+        val length = 12.0
+        fieldOverlay.strokeLine(
+            drawX,
+            drawY,
+            drawX + length * Math.cos(drawHeading),
+            drawY + length * Math.sin(drawHeading)
+        )
+
+        FtcDashboard.getInstance().sendTelemetryPacket(packet)
+
+        telemetry.addData("--- $opModeName ---", "")
+        telemetry.addData("Step", currentStep)
+        telemetry.addData("X Position (in)", "%.2f", poseX)
+        telemetry.addData("Y Position (in)", "%.2f", poseY)
+        telemetry.addData("Heading (deg)", "%.2f", headingDeg)
+        telemetry.addData("AprilTag Found", aprilTagFound)
+        telemetry.addData("Nectar Launcher Vel", "%.1f ticks/sec (Target: %.0f)", nectarLauncherVel, IntakeLauncherSubsystem.NECTAR_TARGET_VELOCITY)
+        telemetry.addData("Pollen Launcher Vel", "%.1f ticks/sec (Target: %.0f)", pollenLauncherVel, IntakeLauncherSubsystem.POLLEN_TARGET_VELOCITY)
+        telemetry.addData("Intake Power", "%.2f", intakeLauncher.intakePower)
+
+        if (aprilTag != null && aprilTag.isValid) {
+            val tagStr = if (aprilTag.id >= 0) "#${aprilTag.id}" else "Lock"
+            telemetry.addData("Limelight AprilTag", "%s | Distance: %.1f in | Offset: %.1f°", tagStr, aprilTag.distanceInches, aprilTag.txDegrees)
+        } else {
+            telemetry.addData("Limelight AprilTag", "No AprilTag Target Detected")
+        }
+
+        telemetry.update()
+    }
+
     fun publishInitStatus(isInitialized: Boolean) {
         telemetry.addData("Camera Init Status", if (isInitialized) "SUCCESS (Connected)" else "FAILED")
         telemetry.addData("Stream URL", LIMELIGHT_IP)

@@ -89,14 +89,19 @@ class OdometrySubsystem(private val robot: RobotHardware) : NextSubsystem() {
             put("Odometry Heading (deg)", heading)
 
             // Draw Robot Overlay on FTC Dashboard
+            // Dashboard coordinates: (0,0) is center, +X goes UP, +Y goes LEFT
+            // Odometry coordinates: (0,0) is bottom-left, +X goes UP, +Y goes RIGHT
+            val drawX = posX - 72.0
+            val drawY = 72.0 - posY
+            val drawHeading = Math.toRadians(heading) - Math.PI / 2.0
+            
             val overlay = fieldOverlay()
             overlay.setStroke("#22C55E")
             overlay.setStrokeWidth(2)
-            overlay.strokeCircle(posX, posY, 9.0)
+            overlay.strokeCircle(drawX, drawY, 9.0)
 
-            val headingRad = Math.toRadians(heading)
             val length = 12.0
-            overlay.strokeLine(posX, posY, posX + (length * cos(headingRad)), posY + (length * sin(headingRad)))
+            overlay.strokeLine(drawX, drawY, drawX + (length * cos(drawHeading)), drawY + (length * sin(drawHeading)))
         }
     }
 

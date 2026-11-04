@@ -291,16 +291,12 @@ class LimelightAimingSubsystem(hardwareMap: HardwareMap) {
     )
 
     fun getBestAprilTag(): AprilTagTarget? {
+        if (limelight?.status == null || limelight?.isConnected == false) return null
         val result = limelight?.latestResult ?: return null
         if (!result.isValid) return null
 
         val fiducials = result.fiducialResults
         if (fiducials.isNullOrEmpty()) {
-            if (result.tx != 0.0 || result.ty != 0.0) {
-                val botpose = result.botpose
-                val distInches = if (botpose != null) hypot(botpose.position.x, botpose.position.y) * 39.3701 else 0.0
-                return AprilTagTarget(id = -1, txDegrees = result.tx, distanceInches = distInches, isValid = true)
-            }
             return null
         }
 
