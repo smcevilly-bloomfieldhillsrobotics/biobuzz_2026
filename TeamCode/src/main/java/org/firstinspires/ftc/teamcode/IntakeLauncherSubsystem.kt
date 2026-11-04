@@ -39,7 +39,7 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) : NextSubsystem(
         @JvmField var NECTAR_TARGET_VELOCITY = 1550.0
         @JvmField var NECTAR_MIN_VELOCITY = 1500.0
 
-        @JvmField var SERVO_PULSE_DURATION_MS = 400L // 400 milliseconds (0.4s)
+        @JvmField var SERVO_PULSE_DURATION_MS = 600L // 600 milliseconds (0.6s)
 
         // Backward compatibility aliases
         @JvmField var TARGET_VELOCITY = 1550.0
