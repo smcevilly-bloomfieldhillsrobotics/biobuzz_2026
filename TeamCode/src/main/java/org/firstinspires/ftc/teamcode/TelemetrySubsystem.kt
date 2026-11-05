@@ -77,6 +77,8 @@ class TelemetrySubsystem(telemetry: Telemetry) {
         telemetry.addData("Controls", "A: Spin Up, RT: Nectar Launcher, LT: Pollen Launcher, RB: Intake, LB: Reverse/Unjam")
         telemetry.addData("Nectar Launcher Vel", "%.1f ticks/sec (Target: %.0f)", nectarLauncherVel, IntakeLauncherSubsystem.NECTAR_TARGET_VELOCITY)
         telemetry.addData("Pollen Launcher Vel", "%.1f ticks/sec (Target: %.0f)", pollenLauncherVel, IntakeLauncherSubsystem.POLLEN_TARGET_VELOCITY)
+        telemetry.addData("Pulse Duration", "%d ms", IntakeLauncherSubsystem.SERVO_PULSE_DURATION_MS)
+        telemetry.addData("Servo Launch Pos (X)", "%.2f (0.0 to 1.0)", IntakeLauncherSubsystem.SERVO_LAUNCH_POSITION)
         telemetry.addData("Intake Power", "%.2f", intakeLauncher.intakePower)
 
         if (aprilTag != null && aprilTag.isValid) {

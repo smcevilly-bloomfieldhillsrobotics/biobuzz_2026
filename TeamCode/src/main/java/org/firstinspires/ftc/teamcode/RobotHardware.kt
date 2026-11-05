@@ -27,6 +27,7 @@ import com.pedropathing.revhub.drivetrains.MecanumConfig
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver
 import com.qualcomm.hardware.limelightvision.Limelight3A
 import com.qualcomm.robotcore.hardware.CRServo
+import com.qualcomm.robotcore.hardware.Servo
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
@@ -65,16 +66,16 @@ class RobotHardware {
     var nectarLauncher: DcMotorEx? = null
     var pollenLauncher: DcMotorEx? = null
     var cameraMotor: DcMotor? = null
-    var nectarLauncherServo: CRServo? = null
-    var pollenLauncherServo: CRServo? = null
+    var nectarLauncherServo: Servo? = null
+    var pollenLauncherServo: Servo? = null
 
     // Backward-compatible aliases
     val launcher: DcMotorEx? get() = nectarLauncher
     val launcher2: DcMotorEx? get() = pollenLauncher
-    val rightLauncherServo: CRServo? get() = nectarLauncherServo
-    val leftLauncherServo: CRServo? get() = pollenLauncherServo
-    val rightServo: CRServo? get() = nectarLauncherServo
-    val leftServo: CRServo? get() = pollenLauncherServo
+    val rightLauncherServo: Servo? get() = nectarLauncherServo
+    val leftLauncherServo: Servo? get() = pollenLauncherServo
+    val rightServo: Servo? get() = nectarLauncherServo
+    val leftServo: Servo? get() = pollenLauncherServo
     var limelight: Limelight3A? = null
     var pinpoint: GoBildaPinpointDriver? = null
 
@@ -161,14 +162,12 @@ class RobotHardware {
             mode = DcMotor.RunMode.RUN_USING_ENCODER
         }
 
-        nectarLauncherServo = tryGetCRServo(hardwareMap, *NECTAR_LAUNCHER_SERVO_NAMES)?.apply {
-            direction = DcMotorSimple.Direction.REVERSE
-            power = 0.0
+        nectarLauncherServo = tryGetServo(hardwareMap, *NECTAR_LAUNCHER_SERVO_NAMES)?.apply {
+            position = 0.5
         }
 
-        pollenLauncherServo = tryGetCRServo(hardwareMap, *POLLEN_LAUNCHER_SERVO_NAMES)?.apply {
-            direction = DcMotorSimple.Direction.FORWARD
-            power = 0.0
+        pollenLauncherServo = tryGetServo(hardwareMap, *POLLEN_LAUNCHER_SERVO_NAMES)?.apply {
+            position = 0.15
         }
     }
 
@@ -231,6 +230,17 @@ class RobotHardware {
             try {
                 val motor = hardwareMap[DcMotorEx::class.java, name]
                 if (motor != null) return motor
+            } catch (_: Exception) {
+            }
+        }
+        return null
+    }
+
+    private fun tryGetServo(hardwareMap: HardwareMap, vararg names: String): Servo? {
+        for (name in names) {
+            try {
+                val servo = hardwareMap[Servo::class.java, name]
+                if (servo != null) return servo
             } catch (_: Exception) {
             }
         }

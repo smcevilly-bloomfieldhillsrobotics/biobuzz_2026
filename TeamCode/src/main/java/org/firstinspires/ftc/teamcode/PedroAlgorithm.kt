@@ -42,7 +42,7 @@ class PedroAlgorithm : Algorithm {
         while (headingError > Math.PI) headingError -= 2 * Math.PI
         while (headingError < -Math.PI) headingError += 2 * Math.PI
 
-        if (hypot(dx, dy) < 2.0 && abs(Math.toDegrees(headingError)) < 4.0) {
+        if (hypot(dx, dy) < 2.5 && abs(Math.toDegrees(headingError)) < 6.0) {
             isBusy = false
             return DrivePowers.zero()
         }

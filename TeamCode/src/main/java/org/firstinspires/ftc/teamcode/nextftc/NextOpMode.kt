@@ -40,7 +40,7 @@ abstract class NextOpMode : LinearOpMode() {
         while (opModeInInit()) {
             driver1.update()
             driver2.update()
-            onLoop() // Or you can create an onInitLoop() if desired
+            onLoop()
             sleep(20)
         }
 

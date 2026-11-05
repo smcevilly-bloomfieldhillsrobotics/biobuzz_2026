@@ -64,29 +64,42 @@ class DriverControls(private val driver1: NextGamepad, private val driver2: Next
         onNectarVelocityUp: (() -> Unit)? = null,
         onNectarVelocityDown: (() -> Unit)? = null,
         onPollenVelocityUp: (() -> Unit)? = null,
-        onPollenVelocityDown: (() -> Unit)? = null
+        onPollenVelocityDown: (() -> Unit)? = null,
+        onPulseDurationUp: (() -> Unit)? = null,
+        onPulseDurationDown: (() -> Unit)? = null,
+        onLaunchPositionUp: (() -> Unit)? = null,
+        onLaunchPositionDown: (() -> Unit)? = null
     ) {
         onToggleFieldCentric?.let { driver1.a.onPress(it) }
         onResetOdometry?.let { driver1.back.onPress(it) }
 
-        onNectarVelocityUp?.let {
-            driver1.dpadUp.onPress { if (!isGamepad2Connected) it() }
-            driver2.dpadUp.onPress(it)
+        // Gamepad 1 D-Pad Up / Down:
+        // When Gamepad 2 is connected, controls pulse duration.
+        // When Gamepad 2 is NOT connected, falls back to adjusting Nectar velocity.
+        driver1.dpadUp.onPress {
+            if (isGamepad2Connected) {
+                onPulseDurationUp?.invoke()
+            } else {
+                onNectarVelocityUp?.invoke()
+            }
         }
+
+        driver1.dpadDown.onPress {
+            if (isGamepad2Connected) {
+                onPulseDurationDown?.invoke()
+            } else {
+                onNectarVelocityDown?.invoke()
+            }
+        }
+
+        onNectarVelocityUp?.let { driver2.dpadUp.onPress(it) }
+        onNectarVelocityDown?.let { driver2.dpadDown.onPress(it) }
         
-        onNectarVelocityDown?.let {
-            driver1.dpadDown.onPress { if (!isGamepad2Connected) it() }
-            driver2.dpadDown.onPress(it)
-        }
-        
-        onPollenVelocityUp?.let {
-            driver1.dpadRight.onPress { if (!isGamepad2Connected) it() }
-            driver2.dpadRight.onPress(it)
-        }
-        
-        onPollenVelocityDown?.let {
-            driver1.dpadLeft.onPress { if (!isGamepad2Connected) it() }
-            driver2.dpadLeft.onPress(it)
-        }
+        onPollenVelocityUp?.let { driver2.dpadRight.onPress(it) }
+        onPollenVelocityDown?.let { driver2.dpadLeft.onPress(it) }
+
+        // Gamepad 1 D-Pad Left / Right: Adjusts servo launch position X (0.0 to 1.0)
+        onLaunchPositionUp?.let { driver1.dpadRight.onPress(it) }
+        onLaunchPositionDown?.let { driver1.dpadLeft.onPress(it) }
     }
 }

@@ -67,10 +67,23 @@ class PedroPaths {
     val centerHiveFinalPath: Path get() = Paths.line(centerHiveIntermediatePose, centerHiveFinalPose).linear(Math.toRadians(90.0), Math.toRadians(270.0))
 
     val aprilTagStartPose: Pose = poseFactory.of(72.0, 9.0, 90.0)
-    val aprilTagIntermediatePose: Pose = poseFactory.of(72.0, 110.0, 90.0)
-    val aprilTagFinalPose: Pose = poseFactory.of(53.0, 110.0, 270.0)
+    val aprilTagIntermediatePose: Pose = poseFactory.of(72.0, 125.0, 90.0)
+    val aprilTagFinalPose: Pose = poseFactory.of(55.0, 125.0, 270.0)
 
     val aprilTagIntermediatePath: Path get() = Paths.line(aprilTagStartPose, aprilTagIntermediatePose).constant(Math.toRadians(90.0))
     val aprilTagFinalPath: Path get() = Paths.line(aprilTagIntermediatePose, aprilTagFinalPose).linear(Math.toRadians(90.0), Math.toRadians(270.0))
+
+    // Parking Path Waypoints: (60, 9) -> (24, 24) -> (24, 110) -> (15, 110)
+    val parkStartPose: Pose = poseFactory.of(60.0, 9.0, 90.0)
+    val parkPose1: Pose = poseFactory.of(24.0, 24.0, 90.0)
+    val parkPose2: Pose = poseFactory.of(24.0, 110.0, 90.0)
+    val parkEndPose: Pose = poseFactory.of(15.0, 110.0, 90.0)
+
+    val parkPathSegment1: Path get() = Paths.line(parkStartPose, parkPose1).constant(Math.toRadians(90.0))
+    val parkPathSegment2: Path get() = Paths.line(parkPose1, parkPose2).constant(Math.toRadians(90.0))
+    val parkPathSegment3: Path get() = Paths.line(parkPose2, parkEndPose).constant(Math.toRadians(90.0))
+
+    // Compound path covering the full parking trajectory in one command
+    val parkPath: Path get() = Paths.path(parkPathSegment1, parkPathSegment2, parkPathSegment3)
 }
 

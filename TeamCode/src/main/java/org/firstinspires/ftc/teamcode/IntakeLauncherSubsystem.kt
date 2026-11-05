@@ -39,7 +39,20 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) : NextSubsystem(
         @JvmField var NECTAR_TARGET_VELOCITY = 1550.0
         @JvmField var NECTAR_MIN_VELOCITY = 1500.0
 
-        @JvmField var SERVO_PULSE_DURATION_MS = 600L // 600 milliseconds (0.6s)
+        @JvmField var SERVO_PULSE_DURATION_MS = 200L // 200 milliseconds (0.2s)
+        
+        // Right (Nectar) Servo Positions: Rest at 0.5, Launch at 0.0
+        @JvmField var RIGHT_SERVO_REST_POSITION = 0.5
+        @JvmField var RIGHT_SERVO_LAUNCH_POSITION = 0.0
+
+        // Left (Pollen) Servo Positions: Rest at 0.15, Launch at inverse of right servo (1.0 - 0.0 = 1.0)
+        @JvmField var LEFT_SERVO_REST_POSITION = 0.15
+        val LEFT_SERVO_LAUNCH_POSITION: Double
+            get() = (1.0 - RIGHT_SERVO_LAUNCH_POSITION).coerceIn(0.0, 1.0)
+
+        // Backward compatibility
+        @JvmField var SERVO_REST_POSITION = 0.5
+        @JvmField var SERVO_LAUNCH_POSITION = 0.0
 
         // Backward compatibility aliases
         @JvmField var TARGET_VELOCITY = 1550.0
@@ -58,6 +71,12 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) : NextSubsystem(
     // Timestamps when 200ms servo pulse ends
     private var nectarServoEndTimeMs = 0L
     private var pollenServoEndTimeMs = 0L
+
+    init {
+        // Enforce rest positions immediately on init: Right = 0.5, Left = 0.15
+        robot.nectarLauncherServo?.position = RIGHT_SERVO_REST_POSITION
+        robot.pollenLauncherServo?.position = LEFT_SERVO_REST_POSITION
+    }
 
     fun adjustVelocity(delta: Double) {
         NECTAR_TARGET_VELOCITY += delta
@@ -78,6 +97,15 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) : NextSubsystem(
 
     fun adjustLauncher1Velocity(delta: Double) = adjustNectarLauncherVelocity(delta)
     fun adjustLauncher2Velocity(delta: Double) = adjustPollenLauncherVelocity(delta)
+
+    fun adjustPulseDuration(deltaMs: Long) {
+        SERVO_PULSE_DURATION_MS = (SERVO_PULSE_DURATION_MS + deltaMs).coerceAtLeast(5L)
+    }
+
+    fun adjustLaunchPosition(delta: Double) {
+        RIGHT_SERVO_LAUNCH_POSITION = (RIGHT_SERVO_LAUNCH_POSITION + delta).coerceIn(0.0, 1.0)
+        SERVO_LAUNCH_POSITION = RIGHT_SERVO_LAUNCH_POSITION
+    }
 
     /**
      * Updates intake and launcher controls:
@@ -117,54 +145,27 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) : NextSubsystem(
         }
         robot.intake?.power = intakePower
 
-        val currentTimeMs = System.currentTimeMillis()
+        // 3. Direct trigger hold detection (Hold trigger -> Launch position, Release trigger -> Rest position)
+        // Temporarily removed the velocity check (nectarAtSpeed / pollenAtSpeed) for testing/calibration
+        val nectarHeld = nectarTrigger > 0.1f
+        val pollenHeld = pollenTrigger > 0.1f
 
-        // 3. Nectar Launcher (Right) Trigger Edge Detection & 200ms Pulse
-        if (nectarTrigger <= 0.05f) {
-            nectarTriggerReleased = true
-        } else if (nectarTrigger > 0.1f) {
-            if (nectarAtSpeed && nectarTriggerReleased) {
-                nectarTriggerReleased = false
-                nectarServoEndTimeMs = currentTimeMs + SERVO_PULSE_DURATION_MS
-            }
-        }
+        // 4. Calculate Servo Positions
+        // Right (Nectar): Pressed -> RIGHT_SERVO_LAUNCH_POSITION (0.0), Released -> RIGHT_SERVO_REST_POSITION (0.5)
+        // Left (Pollen): Pressed -> LEFT_SERVO_LAUNCH_POSITION (inverse: 1.0 - Right Launch), Released -> LEFT_SERVO_REST_POSITION (0.15)
+        val nectarServoPos = if (nectarHeld) RIGHT_SERVO_LAUNCH_POSITION else RIGHT_SERVO_REST_POSITION
+        val pollenServoPos = if (pollenHeld) LEFT_SERVO_LAUNCH_POSITION else LEFT_SERVO_REST_POSITION
 
-        // 4. Pollen Launcher (Left) Trigger Edge Detection & 200ms Pulse
-        if (pollenTrigger <= 0.05f) {
-            pollenTriggerReleased = true
-        } else if (pollenTrigger > 0.1f) {
-            if (pollenAtSpeed && pollenTriggerReleased) {
-                pollenTriggerReleased = false
-                pollenServoEndTimeMs = currentTimeMs + SERVO_PULSE_DURATION_MS
-            }
-        }
-
-        val nectarPulsing = currentTimeMs < nectarServoEndTimeMs
-        val pollenPulsing = currentTimeMs < pollenServoEndTimeMs
-
-        // 5. Calculate Servo Powers
-        val nectarServoPower = when {
-            nectarPulsing -> 1.0
-            leftBumper -> -1.0
-            else -> 0.0
-        }
-
-        val pollenServoPower = when {
-            pollenPulsing -> 1.0
-            leftBumper -> -1.0
-            else -> 0.0
-        }
-
-        // Apply powers to Nectar and Pollen launcher feeder servos
-        robot.nectarLauncherServo?.power = nectarServoPower
-        robot.pollenLauncherServo?.power = pollenServoPower
+        // Apply positions to Nectar and Pollen launcher feeder servos
+        robot.nectarLauncherServo?.position = nectarServoPos
+        robot.pollenLauncherServo?.position = pollenServoPos
     }
 
     override fun stop() {
         intakePower = 0.0
         robot.intake?.power = 0.0
-        robot.nectarLauncherServo?.power = 0.0
-        robot.pollenLauncherServo?.power = 0.0
+        robot.nectarLauncherServo?.position = RIGHT_SERVO_REST_POSITION
+        robot.pollenLauncherServo?.position = LEFT_SERVO_REST_POSITION
         robot.nectarLauncher?.velocity = 0.0
         robot.pollenLauncher?.velocity = 0.0
         nectarTriggerReleased = true

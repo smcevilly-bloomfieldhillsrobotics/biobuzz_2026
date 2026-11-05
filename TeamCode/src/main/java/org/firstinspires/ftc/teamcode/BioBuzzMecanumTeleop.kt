@@ -60,7 +60,11 @@ class BioBuzzMecanumTeleop : NextOpMode() {
             onNectarVelocityUp = { intakeLauncher.adjustNectarLauncherVelocity(50.0) },
             onNectarVelocityDown = { intakeLauncher.adjustNectarLauncherVelocity(-50.0) },
             onPollenVelocityUp = { intakeLauncher.adjustPollenLauncherVelocity(50.0) },
-            onPollenVelocityDown = { intakeLauncher.adjustPollenLauncherVelocity(-50.0) }
+            onPollenVelocityDown = { intakeLauncher.adjustPollenLauncherVelocity(-50.0) },
+            onPulseDurationUp = { intakeLauncher.adjustPulseDuration(5L) },
+            onPulseDurationDown = { intakeLauncher.adjustPulseDuration(-5L) },
+            onLaunchPositionUp = { intakeLauncher.adjustLaunchPosition(0.05) },
+            onLaunchPositionDown = { intakeLauncher.adjustLaunchPosition(-0.05) }
         )
 
         telemetry.addData("Status", "Pedro Mecanum TeleOp Initialized")

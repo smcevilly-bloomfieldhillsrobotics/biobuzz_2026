@@ -111,7 +111,6 @@ abstract class AprilTagBaseAutoOpMode : NextOpMode() {
             override fun start() {}
             
             override fun execute() {
-                aimingSubsystem.update(null)
                 val target = aimingSubsystem.getBestAprilTag()
                 if (target != null && target.isValid && target.id in validTagIds) {
                     aprilTagFound = true
@@ -132,16 +131,16 @@ abstract class AprilTagBaseAutoOpMode : NextOpMode() {
             override fun start() {
                 activeCommand = if (aprilTagFound) {
                     series(
-                        instant { currentStep = "AprilTag found! Launching immediately." },
+                        instant { currentStep = "AprilTag found! Preparing to launch." },
                         LaunchRoutineCommand(
                             robot = robot,
-                            durationMs = 5000L,
+                            durationMs = -1L,
                             tagValidator = {
-                                aimingSubsystem.update(null)
                                 val t = aimingSubsystem.getBestAprilTag()
                                 t != null && t.isValid && t.id in validTagIds
                             },
-                            onStart = { currentStep = "Launching elements for 5 seconds" }
+                            onStatusUpdate = { status -> currentStep = status },
+                            onStart = { currentStep = "Spinning up flywheels (Checking AprilTag)..." }
                         )
                     )
                 } else {
@@ -150,16 +149,16 @@ abstract class AprilTagBaseAutoOpMode : NextOpMode() {
                         followPath(follower, paths.aprilTagIntermediatePath),
                         instant { currentStep = "Driving to opposite side." },
                         followPath(follower, paths.aprilTagFinalPath),
-                        instant { currentStep = "Opposite side reached. Launching." },
+                        instant { currentStep = "Opposite side reached." },
                         LaunchRoutineCommand(
                             robot = robot,
-                            durationMs = 5000L,
+                            durationMs = -1L,
                             tagValidator = {
-                                aimingSubsystem.update(null)
                                 val t = aimingSubsystem.getBestAprilTag()
                                 t != null && t.isValid && t.id in validTagIds
                             },
-                            onStart = { currentStep = "Launching elements for 5 seconds" }
+                            onStatusUpdate = { status -> currentStep = status },
+                            onStart = { currentStep = "Spinning up flywheels (Checking AprilTag)..." }
                         )
                     )
                 }
@@ -187,6 +186,10 @@ abstract class AprilTagBaseAutoOpMode : NextOpMode() {
     override fun onLoop() {
         follower.update()
         val pose = follower.pose()
+        val target = aimingSubsystem.getBestAprilTag()
+        if (target != null && target.isValid && target.id in validTagIds) {
+            aprilTagFound = true
+        }
 
         telemetrySubsystem.publishAutoData(
             opModeName = "AprilTag Autonomous",
@@ -195,7 +198,7 @@ abstract class AprilTagBaseAutoOpMode : NextOpMode() {
             poseX = pose.x(),
             poseY = pose.y(),
             headingDeg = Math.toDegrees(pose.heading()),
-            aprilTag = aimingSubsystem.getBestAprilTag(),
+            aprilTag = target,
             aprilTagFound = aprilTagFound,
             nectarLauncherVel = robot.nectarLauncher?.velocity ?: 0.0,
             pollenLauncherVel = robot.pollenLauncher?.velocity ?: 0.0
