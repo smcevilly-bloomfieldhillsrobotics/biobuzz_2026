@@ -101,11 +101,11 @@ class LimelightAimingSubsystem(hardwareMap: HardwareMap) {
         lastDetectedTags.clear()
         isTagInverted = false
         lastDistance3D = 0.0
-        val motor = cameraMotor ?: return
+        val motor = cameraMotor
 
         val status = limelight?.status ?: run {
             isInitialized = false
-            motor.power = 0.0
+            motor?.power = 0.0
             return
         }
 
@@ -113,7 +113,7 @@ class LimelightAimingSubsystem(hardwareMap: HardwareMap) {
         if (result == null || !result.isValid) {
             lastErrorTx = 0.0
             lastErrorTy = 0.0
-            motor.power = 0.0
+            motor?.power = 0.0
             lastMotorPower = 0.0
             adjustmentTimer.reset()
             return
@@ -250,14 +250,14 @@ class LimelightAimingSubsystem(hardwareMap: HardwareMap) {
                         lastMotorPower = lastMotorPower.coerceIn(-MAX_POWER, MAX_POWER)
                     }
                 }
-                motor.power = lastMotorPower
+                motor?.power = lastMotorPower
                 lastError = lastErrorTx
             }
         } else {
             lastErrorTx = 0.0
             lastErrorTy = 0.0
             lastMotorPower = 0.0
-            motor.power = 0.0
+            motor?.power = 0.0
             adjustmentTimer.reset()
             pidTimer.reset()
         }
