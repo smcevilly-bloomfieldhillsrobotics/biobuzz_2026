@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode
 import com.acmerobotics.dashboard.FtcDashboard
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
+import com.pedropathing.api.PoseFactory
 import com.pedropathing.follower.Follower
 import com.pedropathing.math.Pose
 import com.pedropathing.revhub.localizers.PinpointConfig
@@ -10,6 +11,7 @@ import com.pedropathing.revhub.localizers.PinpointLocalizer
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 import org.firstinspires.ftc.teamcode.nextftc.*
 import java.util.OptionalDouble
+import kotlin.math.hypot
 
 /**
  * Base autonomous OpMode that checks for an AprilTag for the first 5 seconds.
@@ -28,10 +30,12 @@ abstract class AprilTagBaseAutoOpMode : NextOpMode() {
     
     private val paths = PedroPaths()
 
-    // Start pose: 72, 9
-    private val startPose: Pose = paths.aprilTagStartPose
+    // Start pose: 63, 9 (Red) or 81, 9 (Blue)
+    protected open val isBlueAlliance: Boolean = false
+    private val startPose: Pose get() = if (isBlueAlliance) paths.blueAprilTagStartPose else paths.aprilTagStartPose
     
-    // Command states
+    // Command and timing states
+    private var autoStartTimeMs = 0L
     private var aprilTagSearchStartTime = 0L
     private var aprilTagFound = false
     
@@ -102,11 +106,12 @@ abstract class AprilTagBaseAutoOpMode : NextOpMode() {
 
     override fun onStartCommand(): NextCommand = series(
         instant { 
+            autoStartTimeMs = System.currentTimeMillis()
             currentStep = "Searching for AprilTag for 5 seconds..."
             aprilTagSearchStartTime = System.currentTimeMillis()
             aprilTagFound = false
         },
-        // Wait 5 seconds, continuously checking for an AprilTag
+        // Wait up to 5 seconds (or until 10s left in match), continuously checking for an AprilTag
         object : NextCommand {
             override fun start() {}
             
@@ -118,12 +123,14 @@ abstract class AprilTagBaseAutoOpMode : NextOpMode() {
             }
             
             override fun isFinished(): Boolean {
-                return (System.currentTimeMillis() - aprilTagSearchStartTime) >= 5000 || aprilTagFound
+                val elapsed = System.currentTimeMillis() - autoStartTimeMs
+                val timeToPark = elapsed >= 20000L // 30s autonomous period - 10s remaining
+                return (System.currentTimeMillis() - aprilTagSearchStartTime) >= 5000 || aprilTagFound || timeToPark
             }
             
             override fun end(interrupted: Boolean) {}
         },
-        // Conditional branch based on if tag was found
+        // Conditional branch based on if tag was found (finishes when 10 seconds remain in match)
         object : NextCommand {
             private var activeCommand: NextCommand? = null
             private var started = false
@@ -131,35 +138,43 @@ abstract class AprilTagBaseAutoOpMode : NextOpMode() {
             override fun start() {
                 activeCommand = if (aprilTagFound) {
                     series(
-                        instant { currentStep = "AprilTag found! Preparing to launch." },
+                        instant { currentStep = "AprilTag found! Aiming toward Hive Cell..." },
+                        followPath(follower, if (isBlueAlliance) paths.blueStartAimPath else paths.redStartAimPath, timeoutMs = 1500L),
+                        instant { currentStep = "Centered! Launching elements." },
                         LaunchRoutineCommand(
                             robot = robot,
-                            durationMs = -1L,
+                            durationMs = 5000L,
                             tagValidator = {
                                 val t = aimingSubsystem.getBestAprilTag()
                                 t != null && t.isValid && t.id in validTagIds
                             },
                             onStatusUpdate = { status -> currentStep = status },
                             onStart = { currentStep = "Spinning up flywheels (Checking AprilTag)..." }
-                        )
+                        ),
+                        instant { currentStep = "Re-aligning heading for smooth park..." },
+                        followPath(follower, if (isBlueAlliance) paths.blueStartRealignPath else paths.redStartRealignPath, timeoutMs = 1500L)
                     )
                 } else {
                     series(
                         instant { currentStep = "No AprilTag found. Driving to intermediate pose." },
-                        followPath(follower, paths.aprilTagIntermediatePath),
+                        followPath(follower, if (isBlueAlliance) paths.blueAprilTagIntermediatePath else paths.aprilTagIntermediatePath),
                         instant { currentStep = "Driving to opposite side." },
-                        followPath(follower, paths.aprilTagFinalPath),
-                        instant { currentStep = "Opposite side reached." },
+                        followPath(follower, if (isBlueAlliance) paths.blueAprilTagFinalPath else paths.aprilTagFinalPath),
+                        instant { currentStep = "Opposite side reached. Aiming toward Hive Cell..." },
+                        followPath(follower, if (isBlueAlliance) paths.blueOppositeAimPath else paths.redOppositeAimPath, timeoutMs = 1500L),
+                        instant { currentStep = "Centered! Launching elements." },
                         LaunchRoutineCommand(
                             robot = robot,
-                            durationMs = -1L,
+                            durationMs = 5000L,
                             tagValidator = {
                                 val t = aimingSubsystem.getBestAprilTag()
                                 t != null && t.isValid && t.id in validTagIds
                             },
                             onStatusUpdate = { status -> currentStep = status },
                             onStart = { currentStep = "Spinning up flywheels (Checking AprilTag)..." }
-                        )
+                        ),
+                        instant { currentStep = "Re-aligning heading for smooth park..." },
+                        followPath(follower, if (isBlueAlliance) paths.blueOppositeRealignPath else paths.redOppositeRealignPath, timeoutMs = 1500L)
                     )
                 }
                 activeCommand?.start()
@@ -173,14 +188,37 @@ abstract class AprilTagBaseAutoOpMode : NextOpMode() {
             }
 
             override fun isFinished(): Boolean {
-                return started && (activeCommand?.isFinished() ?: true)
+                val elapsed = System.currentTimeMillis() - autoStartTimeMs
+                val tenSecondsLeft = elapsed >= 20000L // 20s elapsed into 30s auto
+                return (started && (activeCommand?.isFinished() ?: true)) || tenSecondsLeft
             }
 
             override fun end(interrupted: Boolean) {
                 activeCommand?.end(interrupted)
             }
         },
-        instant { currentStep = "Autonomous Routine Complete!" }
+        instant { currentStep = "Moving to Park End Pose..." },
+        object : NextCommand {
+            private var followCmd: NextCommand? = null
+
+            override fun start() {
+                val currentPose = follower.pose()
+                val path = paths.pathToPark(currentPose, isBlueAlliance)
+                followCmd = followPath(follower, path)
+                followCmd?.start()
+            }
+
+            override fun execute() {
+                followCmd?.execute()
+            }
+
+            override fun isFinished(): Boolean = followCmd?.isFinished() ?: true
+
+            override fun end(interrupted: Boolean) {
+                followCmd?.end(interrupted)
+            }
+        },
+        instant { currentStep = "Park Complete! Autonomous Routine Complete!" }
     )
 
     override fun onLoop() {
@@ -189,6 +227,20 @@ abstract class AprilTagBaseAutoOpMode : NextOpMode() {
         val target = aimingSubsystem.getBestAprilTag()
         if (target != null && target.isValid && target.id in validTagIds) {
             aprilTagFound = true
+        }
+
+        // Periodic Limelight vision re-localization: if an upright tag cluster is in view,
+        // softly fuse/correct odometry drift into the Pedro Follower pose
+        val visionPose = aimingSubsystem.estimateRobotPose(pose.heading())
+        if (visionPose != null) {
+            // Apply correction if odometry error exceeds 1.5 inches but is within 10 inches (reject false spikes)
+            val odometryError = hypot(visionPose.x - pose.x(), visionPose.y - pose.y())
+            if (odometryError in 1.5..10.0) {
+                // Smooth fusion (80% odometry, 20% vision correction) to eliminate abrupt jumping
+                val correctedX = pose.x() * 0.80 + visionPose.x * 0.20
+                val correctedY = pose.y() * 0.80 + visionPose.y * 0.20
+                follower.setPose(PoseFactory.degrees().of(correctedX, correctedY, Math.toDegrees(pose.heading())))
+            }
         }
 
         telemetrySubsystem.publishAutoData(

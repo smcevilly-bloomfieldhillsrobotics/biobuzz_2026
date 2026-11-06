@@ -290,6 +290,106 @@ class LimelightAimingSubsystem(hardwareMap: HardwareMap) {
         val isValid: Boolean
     )
 
+    data class EstimatedRobotPose(
+        val x: Double,
+        val y: Double,
+        val headingDeg: Double,
+        val matchedCluster: String,
+        val confidence: Double,
+        val distanceToHiveCenterInches: Double
+    )
+
+    /**
+     * Estimates the global field position (X, Y in inches) of the robot using the known
+     * upright AprilTag clusters on the Hive.
+     *
+     * @param robotHeadingRad Current heading of the robot in radians (from Pinpoint / Pedro localizer)
+     * @return EstimatedRobotPose containing estimated X, Y coordinates, or null if no valid upright tag seen
+     */
+    fun estimateRobotPose(robotHeadingRad: Double): EstimatedRobotPose? {
+        val result = limelight?.latestResult ?: return null
+        if (!result.isValid) return null
+
+        val fiducials = result.fiducialResults
+        if (fiducials.isNullOrEmpty()) return null
+
+        // Map tag IDs to known upright cluster center positions (in inches on 144" x 144" field)
+        // Red Audience (34-37): X=59.7, Y=52.5, Normal faces 270° (South)
+        // Red Scoring (30-33):  X=59.7, Y=91.5, Normal faces 90° (North)
+        // Blue Audience (38-41): X=84.3, Y=52.5, Normal faces 270° (South)
+        // Blue Scoring (42-45):  X=84.3, Y=91.5, Normal faces 90° (North)
+        for (fr in fiducials) {
+            val id = fr.fiducialId
+            val tagFieldCenter: Pair<Double, Double>
+            val clusterName: String
+
+            when (id) {
+                in 30..33 -> {
+                    tagFieldCenter = Pair(59.7, 91.5)
+                    clusterName = "RED SCORING"
+                }
+                in 34..37 -> {
+                    tagFieldCenter = Pair(59.7, 52.5)
+                    clusterName = "RED AUDIENCE"
+                }
+                in 38..41 -> {
+                    tagFieldCenter = Pair(84.3, 52.5)
+                    clusterName = "BLUE AUDIENCE"
+                }
+                in 42..45 -> {
+                    tagFieldCenter = Pair(84.3, 91.5)
+                    clusterName = "BLUE SCORING"
+                }
+                else -> continue
+            }
+
+            val pose = fr.targetPoseCameraSpace ?: continue
+            val roll = abs(pose.orientation.getRoll(AngleUnit.DEGREES))
+            val pitch = abs(pose.orientation.getPitch(AngleUnit.DEGREES))
+
+            // Only localize if cell is upright (roll & pitch are stable, not inverted or in transition)
+            if (roll > 45.0 || pitch > 45.0) continue
+
+            // 2D horizontal ground distance in inches
+            val distInches = hypot(pose.position.x, pose.position.z) * 39.3701
+            if (distInches < 6.0 || distInches > 90.0) continue
+
+            // Absolute bearing angle from robot center to tag
+            val txRad = Math.toRadians(fr.targetXDegrees)
+            val bearingRad = robotHeadingRad - txRad
+
+            // Invert the vector from the known tag location back to robot center
+            val estimatedX = tagFieldCenter.first - distInches * sin(bearingRad)
+            val estimatedY = tagFieldCenter.second - distInches * cos(bearingRad)
+
+            // Sanity check within the 144" x 144" field boundary
+            if (estimatedX in 5.0..139.0 && estimatedY in 5.0..139.0) {
+                val headingDeg = Math.toDegrees(robotHeadingRad)
+                // Field center of the entire Hive structure is exactly at (X = 72.0, Y = 72.0)
+                val distToCenter = hypot(72.0 - estimatedX, 72.0 - estimatedY)
+                return EstimatedRobotPose(
+                    x = estimatedX,
+                    y = estimatedY,
+                    headingDeg = headingDeg,
+                    matchedCluster = clusterName,
+                    confidence = 1.0 / (1.0 + (distInches / 50.0)),
+                    distanceToHiveCenterInches = distToCenter
+                )
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * Calculates the estimated distance (in inches) from the robot's current position to the physical
+     * center of the Hive structure at (X=72.0", Y=72.0") whenever any AprilTag on the Hive is seen.
+     */
+    fun getDistanceToHiveCenter(robotHeadingRad: Double): Double? {
+        val pose = estimateRobotPose(robotHeadingRad)
+        return pose?.distanceToHiveCenterInches
+    }
+
     fun getBestAprilTag(): AprilTagTarget? {
         if (limelight?.status == null || limelight?.isConnected == false) return null
         val result = limelight?.latestResult ?: return null

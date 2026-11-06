@@ -27,6 +27,7 @@ import com.acmerobotics.dashboard.config.Config
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 import org.firstinspires.ftc.robotcore.external.Telemetry
+import kotlin.math.hypot
 
 @Config
 class TelemetrySubsystem(telemetry: Telemetry) {
@@ -48,7 +49,9 @@ class TelemetrySubsystem(telemetry: Telemetry) {
         blPower: Double,
         brPower: Double,
         nectarLauncherVel: Double,
-        pollenLauncherVel: Double
+        pollenLauncherVel: Double,
+        rightServoPos: Double = 0.0,
+        leftServoPos: Double = 0.0
     ) {
         val packet = TelemetryPacket()
         packet.put("Drive Mode", if (fieldCentric) "Field-Centric" else "Robot-Centric")
@@ -61,6 +64,9 @@ class TelemetrySubsystem(telemetry: Telemetry) {
         packet.put("FR Power", frPower)
         packet.put("BL Power", blPower)
         packet.put("BR Power", brPower)
+
+        packet.put("Right Servo Pos", rightServoPos)
+        packet.put("Left Servo Pos", leftServoPos)
 
         if (aprilTag != null && aprilTag.isValid) {
             packet.put("AprilTag ID", aprilTag.id)
@@ -77,8 +83,8 @@ class TelemetrySubsystem(telemetry: Telemetry) {
         telemetry.addData("Controls", "A: Spin Up, RT: Nectar Launcher, LT: Pollen Launcher, RB: Intake, LB: Reverse/Unjam")
         telemetry.addData("Nectar Launcher Vel", "%.1f ticks/sec (Target: %.0f)", nectarLauncherVel, IntakeLauncherSubsystem.NECTAR_TARGET_VELOCITY)
         telemetry.addData("Pollen Launcher Vel", "%.1f ticks/sec (Target: %.0f)", pollenLauncherVel, IntakeLauncherSubsystem.POLLEN_TARGET_VELOCITY)
-        telemetry.addData("Pulse Duration", "%d ms", IntakeLauncherSubsystem.SERVO_PULSE_DURATION_MS)
-        telemetry.addData("Servo Launch Pos (X)", "%.2f (0.0 to 1.0)", IntakeLauncherSubsystem.SERVO_LAUNCH_POSITION)
+        telemetry.addData("Right Servo Pos", "%.2f (Rest: %.2f, Launch: %.2f)", rightServoPos, IntakeLauncherSubsystem.RIGHT_SERVO_REST_POSITION, IntakeLauncherSubsystem.RIGHT_SERVO_LAUNCH_POSITION)
+        telemetry.addData("Left Servo Pos", "%.2f (Rest: %.2f, Launch: %.2f)", leftServoPos, IntakeLauncherSubsystem.LEFT_SERVO_REST_POSITION, IntakeLauncherSubsystem.LEFT_SERVO_LAUNCH_POSITION)
         telemetry.addData("Intake Power", "%.2f", intakeLauncher.intakePower)
 
         if (aprilTag != null && aprilTag.isValid) {
@@ -121,6 +127,8 @@ class TelemetrySubsystem(telemetry: Telemetry) {
             packet.put("AprilTag ID", aprilTag.id)
             packet.put("AprilTag Distance (in)", aprilTag.distanceInches)
             packet.put("AprilTag Offset (°)", aprilTag.txDegrees)
+            val distToHive = hypot(72.0 - poseX, 72.0 - poseY)
+            packet.put("Dist to Hive Center (in)", distToHive)
         }
 
         val fieldOverlay = packet.fieldOverlay()
@@ -158,7 +166,9 @@ class TelemetrySubsystem(telemetry: Telemetry) {
 
         if (aprilTag != null && aprilTag.isValid) {
             val tagStr = if (aprilTag.id >= 0) "#${aprilTag.id}" else "Lock"
+            val distToHive = hypot(72.0 - poseX, 72.0 - poseY)
             telemetry.addData("Limelight AprilTag", "%s | Distance: %.1f in | Offset: %.1f°", tagStr, aprilTag.distanceInches, aprilTag.txDegrees)
+            telemetry.addData("Dist to Hive Center", "%.1f inches", distToHive)
         } else {
             telemetry.addData("Limelight AprilTag", "No AprilTag Target Detected")
         }

@@ -114,7 +114,9 @@ class BioBuzzMecanumTeleop : NextOpMode() {
             aprilTag,
             flPower, frPower, blPower, brPower,
             robot.nectarLauncher?.velocity ?: 0.0,
-            robot.pollenLauncher?.velocity ?: 0.0
+            robot.pollenLauncher?.velocity ?: 0.0,
+            robot.nectarLauncherServo?.position ?: 0.0,
+            robot.pollenLauncherServo?.position ?: 0.0
         )
     }
 

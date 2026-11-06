@@ -42,10 +42,10 @@ class OdometrySubsystem(private val robot: RobotHardware) : NextSubsystem() {
 
     companion object {
         // Pod offsets for goBILDA Pinpoint Odometry Computer:
-        // X Pod (Forward pod): Centered on X axis = 0.0 mm
-        // Y Pod (Strafe pod): 8.0 inches Backward from center = -203.2 mm
-        const val X_POD_OFFSET_MM = 0.0
-        const val Y_POD_OFFSET_MM = -203.2
+        // X Pod (Forward pod): 8.0 inches left from center = +203.2 mm
+        // Y Pod (Strafe pod): 1.5 inches Backward from center = -38.1 mm
+        const val X_POD_OFFSET_MM = 203.2
+        const val Y_POD_OFFSET_MM = -38.1
     }
 
     var posX = 0.0

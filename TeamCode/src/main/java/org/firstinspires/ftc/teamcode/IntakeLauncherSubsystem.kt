@@ -43,12 +43,11 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) : NextSubsystem(
         
         // Right (Nectar) Servo Positions: Rest at 0.5, Launch at 0.0
         @JvmField var RIGHT_SERVO_REST_POSITION = 0.5
-        @JvmField var RIGHT_SERVO_LAUNCH_POSITION = 0.0
+        @JvmField var RIGHT_SERVO_LAUNCH_POSITION = 0.15
 
         // Left (Pollen) Servo Positions: Rest at 0.15, Launch at inverse of right servo (1.0 - 0.0 = 1.0)
         @JvmField var LEFT_SERVO_REST_POSITION = 0.15
-        val LEFT_SERVO_LAUNCH_POSITION: Double
-            get() = (1.0 - RIGHT_SERVO_LAUNCH_POSITION).coerceIn(0.0, 1.0)
+        @JvmField val LEFT_SERVO_LAUNCH_POSITION = 0.5
 
         // Backward compatibility
         @JvmField var SERVO_REST_POSITION = 0.5
@@ -146,13 +145,13 @@ class IntakeLauncherSubsystem(private val robot: RobotHardware) : NextSubsystem(
         robot.intake?.power = intakePower
 
         // 3. Direct trigger hold detection (Hold trigger -> Launch position, Release trigger -> Rest position)
-        // Temporarily removed the velocity check (nectarAtSpeed / pollenAtSpeed) for testing/calibration
-        val nectarHeld = nectarTrigger > 0.1f
-        val pollenHeld = pollenTrigger > 0.1f
+        // Servo moves only once the respective flywheel is up to speed (at or above MIN_VELOCITY)
+        val nectarHeld = nectarTrigger > 0.1f && nectarAtSpeed
+        val pollenHeld = pollenTrigger > 0.1f && pollenAtSpeed
 
         // 4. Calculate Servo Positions
-        // Right (Nectar): Pressed -> RIGHT_SERVO_LAUNCH_POSITION (0.0), Released -> RIGHT_SERVO_REST_POSITION (0.5)
-        // Left (Pollen): Pressed -> LEFT_SERVO_LAUNCH_POSITION (inverse: 1.0 - Right Launch), Released -> LEFT_SERVO_REST_POSITION (0.15)
+        // Right (Nectar): Pressed & at speed -> RIGHT_SERVO_LAUNCH_POSITION, Released/below speed -> RIGHT_SERVO_REST_POSITION
+        // Left (Pollen): Pressed & at speed -> LEFT_SERVO_LAUNCH_POSITION, Released/below speed -> LEFT_SERVO_REST_POSITION
         val nectarServoPos = if (nectarHeld) RIGHT_SERVO_LAUNCH_POSITION else RIGHT_SERVO_REST_POSITION
         val pollenServoPos = if (pollenHeld) LEFT_SERVO_LAUNCH_POSITION else LEFT_SERVO_REST_POSITION
 

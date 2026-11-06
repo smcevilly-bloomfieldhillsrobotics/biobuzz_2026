@@ -35,14 +35,33 @@ class PedroAlgorithm : Algorithm {
         val robotPose = motionState.pose()
         currentPose = robotPose
 
+        val currentSeg = pathTracker.current()
         val endPose = pathTracker.endPose()
-        val dx = endPose.x() - robotPose.x()
-        val dy = endPose.y() - robotPose.y()
-        var headingError = endPose.heading() - robotPose.heading()
+
+        // Calculate a lookahead target point along the actual curve
+        val robotPosVec = Vector2D.cartesian(robotPose.x(), robotPose.y())
+        val targetPose: Pose = if (currentSeg != null) {
+            val closestT = currentSeg.curve.closestParameter(robotPosVec)
+            // Lookahead along the curve by ~0.15 of parameter t (roughly 10-15 inches)
+            val lookaheadT = (closestT + 0.15).coerceIn(0.0, 1.0)
+            currentSeg.get(lookaheadT)
+        } else {
+            endPose
+        }
+
+        // Target error vectors based on the lookahead point on the curve
+        val dx = targetPose.x() - robotPose.x()
+        val dy = targetPose.y() - robotPose.y()
+        var headingError = targetPose.heading() - robotPose.heading()
         while (headingError > Math.PI) headingError -= 2 * Math.PI
         while (headingError < -Math.PI) headingError += 2 * Math.PI
 
-        if (hypot(dx, dy) < 2.5 && abs(Math.toDegrees(headingError)) < 6.0) {
+        val distToEnd = hypot(endPose.x() - robotPose.x(), endPose.y() - robotPose.y())
+        var finalHeadingError = endPose.heading() - robotPose.heading()
+        while (finalHeadingError > Math.PI) finalHeadingError -= 2 * Math.PI
+        while (finalHeadingError < -Math.PI) finalHeadingError += 2 * Math.PI
+
+        if (distToEnd < 2.0 && abs(Math.toDegrees(finalHeadingError)) < 5.0) {
             isBusy = false
             return DrivePowers.zero()
         }
@@ -57,7 +76,7 @@ class PedroAlgorithm : Algorithm {
         return DrivePowers(
             fwdCmd.coerceIn(-PedroConstants.MAX_AUTO_POWER, PedroConstants.MAX_AUTO_POWER),
             strCmd.coerceIn(-PedroConstants.MAX_AUTO_POWER, PedroConstants.MAX_AUTO_POWER),
-            turnCmd.coerceIn(-0.4, 0.4)
+            turnCmd.coerceIn(-0.55, 0.55)
         )
     }
 

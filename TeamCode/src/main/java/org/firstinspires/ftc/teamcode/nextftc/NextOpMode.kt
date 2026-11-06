@@ -40,7 +40,7 @@ abstract class NextOpMode : LinearOpMode() {
         while (opModeInInit()) {
             driver1.update()
             driver2.update()
-            onLoop()
+            onInitLoop()
             sleep(20)
         }
 
@@ -78,6 +78,7 @@ abstract class NextOpMode : LinearOpMode() {
     }
 
     open fun onInit() {}
+    open fun onInitLoop() {}
     open fun onStartCommand(): NextCommand? = null
     open fun onLoop() {}
 }

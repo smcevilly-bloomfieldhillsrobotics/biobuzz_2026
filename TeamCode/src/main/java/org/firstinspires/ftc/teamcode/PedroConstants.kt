@@ -30,12 +30,15 @@ object PedroConstants {
     @JvmField var CUSTOM_TICKS_PER_INCH = 336.878
 
     // Pinpoint Odometry Pod Offsets (Measured from physical robot layout)
-    // X Pod (Forward Pod): Far Left (+7.5 inches = +190.5 mm)
-    // Y Pod (Strafe Pod): 1 3/4" back (-1.75 inches = -44.45 mm)
-    @JvmField var X_POD_OFFSET_INCHES = 7.5
-    @JvmField var Y_POD_OFFSET_INCHES = -1.75
-    @JvmField var X_POD_OFFSET_MM = 190.5 // +190.5 mm left of center
-    @JvmField var Y_POD_OFFSET_MM = -44.45 // -44.45 mm (1 3/4" back from center)
+    // Robot is an 18" square. Odometry wheels are on the exterior (~8.0" - 8.5" lateral, or 7.5"-8.5" from center)
+    // Both pods are symmetrical 1.5 inches back from center (-1.5" = -38.1 mm)
+    // In goBILDA Pinpoint conventions:
+    // X Pod Offset = lateral distance perpendicular to forward direction (+left / -right) = +8.0 inches (+203.2 mm)
+    // Y Pod Offset = longitudinal distance perpendicular to strafe direction (+front / -rear) = -1.5 inches (-38.1 mm)
+    @JvmField var X_POD_OFFSET_INCHES = 8.0
+    @JvmField var Y_POD_OFFSET_INCHES = -1.5
+    @JvmField var X_POD_OFFSET_MM = 203.2 // +203.2 mm (8.0" left of center)
+    @JvmField var Y_POD_OFFSET_MM = -38.1 // -38.1 mm (1.5" back from center)
 
     // --- Path Follower PIDF Feedback Gains ---
     @JvmField var TRANSLATIONAL_P = 0.065
@@ -46,5 +49,6 @@ object PedroConstants {
     @JvmField var HEADING_I = 0.000
     @JvmField var HEADING_D = 0.040
 
-    @JvmField var MAX_AUTO_POWER = 0.65
+    // Autonomous driving power limit (increased for faster, dynamic movement)
+    @JvmField var MAX_AUTO_POWER = 0.80
 }

@@ -7,5 +7,6 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous
  */
 @Autonomous(name = "AprilTag Autonomous - Blue (38-45)", group = "Autonomous")
 class AprilTagBlueAutoOpMode : AprilTagBaseAutoOpMode() {
+    override val isBlueAlliance: Boolean = true
     override val validTagIds: IntRange = 38..45
 }

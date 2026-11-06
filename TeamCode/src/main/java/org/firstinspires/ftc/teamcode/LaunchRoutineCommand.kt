@@ -59,12 +59,23 @@ class LaunchRoutineCommand(
 
         // Phase 1: Launch window (1000ms onwards)
         if (phase == 1) {
+            val nectarAtSpeed = (robot.nectarLauncher?.velocity ?: 0.0) >= IntakeLauncherSubsystem.NECTAR_MIN_VELOCITY
+            val pollenAtSpeed = (robot.pollenLauncher?.velocity ?: 0.0) >= IntakeLauncherSubsystem.POLLEN_MIN_VELOCITY
+
             if (isLaunching) {
-                robot.leftLauncherServo?.position = IntakeLauncherSubsystem.SERVO_LAUNCH_POSITION
-                robot.rightLauncherServo?.position = IntakeLauncherSubsystem.SERVO_LAUNCH_POSITION
+                robot.leftLauncherServo?.position = if (pollenAtSpeed) {
+                    IntakeLauncherSubsystem.LEFT_SERVO_LAUNCH_POSITION
+                } else {
+                    IntakeLauncherSubsystem.LEFT_SERVO_REST_POSITION
+                }
+                robot.rightLauncherServo?.position = if (nectarAtSpeed) {
+                    IntakeLauncherSubsystem.RIGHT_SERVO_LAUNCH_POSITION
+                } else {
+                    IntakeLauncherSubsystem.RIGHT_SERVO_REST_POSITION
+                }
             } else {
-                robot.leftLauncherServo?.position = IntakeLauncherSubsystem.SERVO_REST_POSITION
-                robot.rightLauncherServo?.position = IntakeLauncherSubsystem.SERVO_REST_POSITION
+                robot.leftLauncherServo?.position = IntakeLauncherSubsystem.LEFT_SERVO_REST_POSITION
+                robot.rightLauncherServo?.position = IntakeLauncherSubsystem.RIGHT_SERVO_REST_POSITION
             }
         }
     }
@@ -82,7 +93,7 @@ class LaunchRoutineCommand(
         robot.nectarLauncher?.velocity = 0.0
         robot.pollenLauncher?.velocity = 0.0
         robot.intake?.power = 0.0
-        robot.leftLauncherServo?.position = IntakeLauncherSubsystem.SERVO_REST_POSITION
-        robot.rightLauncherServo?.position = IntakeLauncherSubsystem.SERVO_REST_POSITION
+        robot.leftLauncherServo?.position = IntakeLauncherSubsystem.LEFT_SERVO_REST_POSITION
+        robot.rightLauncherServo?.position = IntakeLauncherSubsystem.RIGHT_SERVO_REST_POSITION
     }
 }
